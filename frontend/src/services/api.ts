@@ -254,3 +254,62 @@ export const getUptimeAvailablePeriods = async (itemid: number): Promise<Availab
   const { data } = await api.get<AvailablePeriod[]>(`/uptime-available-periods/${itemid}`);
   return data;
 };
+
+// ─── SFP Ports Interfaces ───────────────────────────────────────────────
+
+export interface SfpPortStat {
+  port_name: string;
+  itemid: number;
+  port_number: number;
+  last_value: number | string | null;
+  min_value: number | string | null;
+  avg_value: number | string | null;
+  max_value: number | string | null;
+  down_count: number | string;
+  last_down: string | null;
+}
+
+export interface SfpHistoryPoint {
+  day: string;
+  min_value: number | string;
+  max_value: number | string;
+  avg_value: number | string;
+  last_value: number | string | null;
+}
+
+// ─── SFP Ports API Functions ─────────────────────────────────────────────
+
+export const getSfpPortsStats = async (): Promise<SfpPortStat[]> => {
+  const { data } = await api.get<any[]>('/sfp-ports-stats');
+  return data.map((item) => ({
+    port_name: item.port_name || '',
+    itemid: Number(item.itemid),
+    port_number: Number(item.port_number),
+    last_value: item.last_value !== null && item.last_value !== undefined ? Number(item.last_value) : null,
+    min_value: item.min_value !== null && item.min_value !== undefined ? Number(item.min_value) : null,
+    avg_value: item.avg_value !== null && item.avg_value !== undefined ? Number(item.avg_value) : null,
+    max_value: item.max_value !== null && item.max_value !== undefined ? Number(item.max_value) : null,
+    down_count: Number(item.down_count || 0),
+    last_down: item.last_down || null,
+  }));
+};
+
+export const getSfpPortHistory = async (itemid: number, from?: number, to?: number): Promise<SfpHistoryPoint[]> => {
+  const params = new URLSearchParams();
+  if (from) params.append('from', from.toString());
+  if (to) params.append('to', to.toString());
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const { data } = await api.get<any[]>(`/sfp-port-history/${itemid}${query}`);
+  return data.map((item) => ({
+    day: item.day,
+    min_value: Number(item.min_value),
+    max_value: Number(item.max_value),
+    avg_value: Number(item.avg_value),
+    last_value: item.last_value !== null && item.last_value !== undefined ? Number(item.last_value) : null,
+  }));
+};
+
+export const getSfpAvailablePeriods = async (itemid: number): Promise<AvailablePeriod[]> => {
+  const { data } = await api.get<AvailablePeriod[]>(`/sfp-available-periods/${itemid}`);
+  return data;
+};

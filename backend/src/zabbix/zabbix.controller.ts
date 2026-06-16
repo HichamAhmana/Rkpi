@@ -119,4 +119,29 @@ export class ZabbixController {
   getUptimeAvailablePeriods(@Param('itemid') itemid: string) {
     return this.zabbixService.getUptimeAvailablePeriods(itemid);
   }
+
+  // ─── SW-1 SFP Ports ───────────────────────────────────────────────
+
+  @Get('sfp-ports-stats')
+  getSfpPortsStats() {
+    return this.zabbixService.getSfpPortsStats();
+  }
+
+  @Get('sfp-port-history/:itemid')
+  getSfpPortHistory(
+    @Param('itemid') itemid: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.zabbixService.getSfpPortHistory(
+      itemid,
+      from ? parseInt(from) : undefined,
+      to ? parseInt(to) : undefined,
+    );
+  }
+
+  @Get('sfp-available-periods/:itemid')
+  getSfpAvailablePeriods(@Param('itemid') itemid: string) {
+    return this.zabbixService.getSfpAvailablePeriods(itemid);
+  }
 }

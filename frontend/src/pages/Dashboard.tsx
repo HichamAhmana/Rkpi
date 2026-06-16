@@ -10,6 +10,7 @@ import CpuDetailsTable from '../components/CpuDetailsTable';
 import ServiceAvailabilityTable from '../components/ServiceAvailabilityTable';
 import AgentAvailabilitySection from '../components/AgentAvailabilitySection';
 import UptimeSection from '../components/UptimeSection';
+import SfpPortsSection from '../components/SfpPortsSection';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 import {
   getHostStats,
@@ -21,6 +22,7 @@ import {
   getServiceAvailability,
   getAgentAvailabilityStats,
   getUptimeStats,
+  getSfpPortsStats,
 } from '../services/api';
 import type {
   HostStats,
@@ -32,6 +34,7 @@ import type {
   ServerServices,
   AgentStat,
   UptimeStat,
+  SfpPortStat,
 } from '../services/api';
 
 const POLL_INTERVAL = 60_000; // 60 seconds
@@ -49,6 +52,7 @@ const Dashboard: React.FC = () => {
   const [serviceData, setServiceData] = useState<ServerServices[]>([]);
   const [agentData, setAgentData] = useState<AgentStat[]>([]);
   const [uptimeData, setUptimeData] = useState<UptimeStat[]>([]);
+  const [sfpData, setSfpData] = useState<SfpPortStat[]>([]);
 
   const isMountedRef = useRef(true);
   const hasLoadedOnceRef = useRef(false);
@@ -59,7 +63,7 @@ const Dashboard: React.FC = () => {
         setInitialLoading(true);
       }
 
-      const [hosts, triggers, problems, cpus, cpuDetails, services, agents, uptimes] =
+      const [hosts, triggers, problems, cpus, cpuDetails, services, agents, uptimes, sfpPorts] =
         await Promise.all([
           getHostStats(),
           getTriggerStats(),
@@ -70,6 +74,7 @@ const Dashboard: React.FC = () => {
           getServiceAvailability(),
           getAgentAvailabilityStats(),
           getUptimeStats(),
+          getSfpPortsStats(),
         ]);
 
       if (isMountedRef.current) {
@@ -82,6 +87,7 @@ const Dashboard: React.FC = () => {
         setServiceData(services);
         setAgentData(agents);
         setUptimeData(uptimes);
+        setSfpData(sfpPorts);
         setError(null);
 
         if (!hasLoadedOnceRef.current) {
@@ -182,6 +188,9 @@ const Dashboard: React.FC = () => {
 
       {/* Server Uptime */}
       <UptimeSection data={uptimeData} />
+
+      {/* SW-1 SFP Uplink Ports */}
+      <SfpPortsSection data={sfpData} />
 
       {/* Agent Availability */}
       <AgentAvailabilitySection data={agentData} />
