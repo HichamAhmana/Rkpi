@@ -11,6 +11,7 @@ import ServiceAvailabilityTable from '../components/ServiceAvailabilityTable';
 import AgentAvailabilitySection from '../components/AgentAvailabilitySection';
 import UptimeSection from '../components/UptimeSection';
 import SfpPortsSection from '../components/SfpPortsSection';
+import SwitchUptimeSection from '../components/SwitchUptimeSection';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
 import {
   getHostStats,
@@ -23,6 +24,7 @@ import {
   getAgentAvailabilityStats,
   getUptimeStats,
   getSfpPortsStats,
+  getSwitchUptimeStats,
 } from '../services/api';
 import type {
   HostStats,
@@ -35,6 +37,7 @@ import type {
   AgentStat,
   UptimeStat,
   SfpPortStat,
+  SwitchUptimeStat,
 } from '../services/api';
 
 const POLL_INTERVAL = 60_000; // 60 seconds
@@ -53,6 +56,7 @@ const Dashboard: React.FC = () => {
   const [agentData, setAgentData] = useState<AgentStat[]>([]);
   const [uptimeData, setUptimeData] = useState<UptimeStat[]>([]);
   const [sfpData, setSfpData] = useState<SfpPortStat[]>([]);
+  const [switchData, setSwitchData] = useState<SwitchUptimeStat[]>([]);
 
   const isMountedRef = useRef(true);
   const hasLoadedOnceRef = useRef(false);
@@ -63,7 +67,7 @@ const Dashboard: React.FC = () => {
         setInitialLoading(true);
       }
 
-      const [hosts, triggers, problems, cpus, cpuDetails, services, agents, uptimes, sfpPorts] =
+      const [hosts, triggers, problems, cpus, cpuDetails, services, agents, uptimes, sfpPorts, switches] =
         await Promise.all([
           getHostStats(),
           getTriggerStats(),
@@ -75,6 +79,7 @@ const Dashboard: React.FC = () => {
           getAgentAvailabilityStats(),
           getUptimeStats(),
           getSfpPortsStats(),
+          getSwitchUptimeStats(),
         ]);
 
       if (isMountedRef.current) {
@@ -88,6 +93,7 @@ const Dashboard: React.FC = () => {
         setAgentData(agents);
         setUptimeData(uptimes);
         setSfpData(sfpPorts);
+        setSwitchData(switches);
         setError(null);
 
         if (!hasLoadedOnceRef.current) {
@@ -191,6 +197,9 @@ const Dashboard: React.FC = () => {
 
       {/* SW-1 SFP Uplink Ports */}
       <SfpPortsSection data={sfpData} />
+
+      {/* Network Switches — Uptime & Availability */}
+      <SwitchUptimeSection data={switchData} />
 
       {/* Agent Availability */}
       <AgentAvailabilitySection data={agentData} />

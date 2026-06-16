@@ -313,3 +313,66 @@ export const getSfpAvailablePeriods = async (itemid: number): Promise<AvailableP
   const { data } = await api.get<AvailablePeriod[]>(`/sfp-available-periods/${itemid}`);
   return data;
 };
+
+// ─── Switch Uptime Interfaces ───────────────────────────────────────────
+
+export interface SwitchUptimeStat {
+  switch_name: string;
+  hostid: number;
+  itemid: number;
+  current_uptime_seconds: number;
+  last_check: string | null;
+  min_uptime_seconds: number | null;
+  restart_count: number;
+  last_restart_time: string | null;
+  total_ports: number;
+  up_ports: number;
+  down_ports: number;
+}
+
+export interface SwitchUptimeHistoryPoint {
+  day: string;
+  max_uptime_seconds: number;
+  min_uptime_seconds: number;
+  had_restart: number;
+}
+
+// ─── Switch Uptime API Functions ────────────────────────────────────────
+
+export const getSwitchUptimeStats = async (): Promise<SwitchUptimeStat[]> => {
+  const { data } = await api.get<any[]>('/switch-uptime-stats');
+  return data.map((item) => ({
+    switch_name: item.switch_name || '',
+    hostid: Number(item.hostid),
+    itemid: Number(item.itemid),
+    current_uptime_seconds: Number(item.current_uptime_seconds || 0),
+    last_check: item.last_check || null,
+    min_uptime_seconds: item.min_uptime_seconds !== null && item.min_uptime_seconds !== undefined
+      ? Number(item.min_uptime_seconds)
+      : null,
+    restart_count: Number(item.restart_count || 0),
+    last_restart_time: item.last_restart_time || null,
+    total_ports: Number(item.total_ports || 0),
+    up_ports: Number(item.up_ports || 0),
+    down_ports: Number(item.down_ports || 0),
+  }));
+};
+
+export const getSwitchUptimeHistory = async (itemid: number, from?: number, to?: number): Promise<SwitchUptimeHistoryPoint[]> => {
+  const params = new URLSearchParams();
+  if (from) params.append('from', from.toString());
+  if (to) params.append('to', to.toString());
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const { data } = await api.get<any[]>(`/switch-uptime-history/${itemid}${query}`);
+  return data.map((item) => ({
+    day: item.day,
+    max_uptime_seconds: Number(item.max_uptime_seconds || 0),
+    min_uptime_seconds: Number(item.min_uptime_seconds || 0),
+    had_restart: Number(item.had_restart || 0),
+  }));
+};
+
+export const getSwitchUptimeAvailablePeriods = async (itemid: number): Promise<AvailablePeriod[]> => {
+  const { data } = await api.get<AvailablePeriod[]>(`/switch-uptime-periods/${itemid}`);
+  return data;
+};

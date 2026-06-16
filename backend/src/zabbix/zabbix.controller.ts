@@ -144,4 +144,29 @@ export class ZabbixController {
   getSfpAvailablePeriods(@Param('itemid') itemid: string) {
     return this.zabbixService.getSfpAvailablePeriods(itemid);
   }
+
+  // ─── Network Switches ─────────────────────────────────────────────
+
+  @Get('switch-uptime-stats')
+  getSwitchUptimeStats() {
+    return this.zabbixService.getSwitchUptimeStats();
+  }
+
+  @Get('switch-uptime-history/:itemid')
+  getSwitchUptimeHistory(
+    @Param('itemid') itemid: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.zabbixService.getSwitchUptimeHistory(
+      itemid,
+      from ? parseInt(from) : undefined,
+      to ? parseInt(to) : undefined,
+    );
+  }
+
+  @Get('switch-uptime-periods/:itemid')
+  getSwitchUptimeAvailablePeriods(@Param('itemid') itemid: string) {
+    return this.zabbixService.getSwitchUptimeAvailablePeriods(itemid);
+  }
 }

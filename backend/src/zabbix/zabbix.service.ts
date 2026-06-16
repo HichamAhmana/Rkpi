@@ -581,4 +581,107 @@ export class ZabbixService {
       month: Number(r.month),
     }));
   }
+
+  // ─── Network Switches ─────────────────────────────────────────────
+
+  async getSwitchUptimeStats(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as switch_name,
+        h.hostid,
+        i.itemid,
+        -- Current uptime in seconds
+        (SELECT hu.value FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         ORDER BY hu.clock DESC LIMIT 1) as current_uptime_seconds,
+        -- Last check time
+        (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         ORDER BY hu.clock DESC LIMIT 1) as last_check,
+        -- Min uptime in period
+        (SELECT MIN(hu.value) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as min_uptime_seconds,
+        -- Restart count (uptime < 300 seconds = just rebooted)
+        (SELECT COUNT(*) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value < 300
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as restart_count,
+        -- Last restart time
+        (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value < 300
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
+        -- Port stats
+        (SELECT COUNT(DISTINCT i2.itemid) FROM items i2
+         WHERE i2.hostid = h.hostid AND i2.key_ LIKE 'ifOperStatus.%') as total_ports,
+        (SELECT SUM(CASE WHEN hu2.value = 1 THEN 1 ELSE 0 END)
+         FROM items i2
+         JOIN history_uint hu2 ON hu2.itemid = i2.itemid
+         WHERE i2.hostid = h.hostid
+         AND i2.key_ LIKE 'ifOperStatus.%'
+         AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
+        ) as up_ports,
+        (SELECT SUM(CASE WHEN hu2.value = 2 THEN 1 ELSE 0 END)
+         FROM items i2
+         JOIN history_uint hu2 ON hu2.itemid = i2.itemid
+         WHERE i2.hostid = h.hostid
+         AND i2.key_ LIKE 'ifOperStatus.%'
+         AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
+        ) as down_ports
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.itemid IN (64359, 68052, 67018, 67802, 68230, 67660)
+      ORDER BY h.name
+    `);
+  }
+
+  async getSwitchUptimeHistory(
+    itemid: string,
+    from?: number,
+    to?: number,
+  ): Promise<unknown[]> {
+    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
+
+    return this.zabbixDataSource.query(
+      `
+      SELECT
+        DATE(FROM_UNIXTIME(clock)) as day,
+        MAX(value) as max_uptime_seconds,
+        MIN(value) as min_uptime_seconds,
+        CASE WHEN MIN(value) < 300 THEN 1 ELSE 0 END as had_restart
+      FROM history_uint
+      WHERE itemid = ?
+        AND clock >= ?
+        AND clock <= ?
+      GROUP BY DATE(FROM_UNIXTIME(clock))
+      ORDER BY day ASC
+      `,
+      [itemid, fromTs, toTs],
+    );
+  }
+
+  async getSwitchUptimeAvailablePeriods(
+    itemid: string,
+  ): Promise<{ year: number; month: number }[]> {
+    const raw: Array<{ year: number | string; month: number | string }> =
+      await this.zabbixDataSource.query(
+        `
+      SELECT
+        YEAR(FROM_UNIXTIME(clock)) as year,
+        MONTH(FROM_UNIXTIME(clock)) as month
+      FROM history_uint
+      WHERE itemid = ?
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+      `,
+        [itemid],
+      );
+    return raw.map((r) => ({
+      year: Number(r.year),
+      month: Number(r.month),
+    }));
+  }
 }
