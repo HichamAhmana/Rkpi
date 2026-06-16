@@ -1,0 +1,492 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+import { Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+
+@Injectable()
+export class ZabbixService {
+  constructor(
+    @InjectDataSource('zabbix')
+    private zabbixDataSource: DataSource,
+  ) {}
+
+  async ping(): Promise<{ status: string }> {
+    await this.zabbixDataSource.query('SELECT 1');
+    return { status: 'Zabbix DB connected' };
+  }
+
+  async getHosts(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT 
+        h.hostid,
+        h.host,
+        h.name,
+        h.status,
+        h.description,
+        MAX(i.available) as available
+      FROM hosts h
+      LEFT JOIN interface i ON i.hostid = h.hostid
+      WHERE h.flags = 0 
+        AND h.templateid IS NULL
+      GROUP BY h.hostid, h.host, h.name, h.status, h.description
+      ORDER BY h.name
+    `);
+  }
+
+  async getHostStats(): Promise<unknown> {
+    const rows: unknown[] = await this.zabbixDataSource.query(`
+    SELECT
+      COUNT(DISTINCT h.hostid) as total,
+      SUM(CASE WHEN h.status = 0 AND i.available = 1 THEN 1 ELSE 0 END) as online,
+      SUM(CASE WHEN h.status = 0 AND i.available = 2 THEN 1 ELSE 0 END) as offline,
+      SUM(CASE WHEN h.status = 0 AND (i.available = 0 OR i.available IS NULL) THEN 1 ELSE 0 END) as unknown,
+      SUM(CASE WHEN h.status = 1 THEN 1 ELSE 0 END) as disabled,
+      SUM(CASE WHEN h.maintenance_status = 1 THEN 1 ELSE 0 END) as in_maintenance
+    FROM hosts h
+    LEFT JOIN interface i ON i.hostid = h.hostid
+    WHERE h.flags = 0
+      AND h.status != 3
+  `);
+    return rows[0];
+  }
+
+  async getTriggerStats(): Promise<unknown> {
+    const rows: unknown[] = await this.zabbixDataSource.query(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN t.value = 1 AND t.status = 0 THEN 1 ELSE 0 END) as problem,
+        SUM(CASE WHEN t.value = 0 AND t.status = 0 THEN 1 ELSE 0 END) as ok,
+        SUM(CASE WHEN t.priority = 5 AND t.value = 1 THEN 1 ELSE 0 END) as disaster,
+        SUM(CASE WHEN t.priority = 4 AND t.value = 1 THEN 1 ELSE 0 END) as high,
+        SUM(CASE WHEN t.priority = 3 AND t.value = 1 THEN 1 ELSE 0 END) as average,
+        SUM(CASE WHEN t.priority = 2 AND t.value = 1 THEN 1 ELSE 0 END) as warning,
+        SUM(CASE WHEN t.priority = 1 AND t.value = 1 THEN 1 ELSE 0 END) as info
+      FROM triggers t
+      JOIN functions f ON f.triggerid = t.triggerid
+      JOIN items i ON i.itemid = f.itemid
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE t.flags = 0
+        AND h.templateid IS NULL
+        AND h.flags = 0
+    `);
+    return rows[0];
+  }
+
+  async getRecentEvents(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        e.eventid,
+        e.clock,
+        e.name,
+        e.severity,
+        e.value,
+        e.acknowledged,
+        FROM_UNIXTIME(e.clock) as event_time,
+        h.name as host_name
+      FROM events e
+      JOIN triggers t ON t.triggerid = e.objectid
+      JOIN functions f ON f.triggerid = t.triggerid
+      JOIN items i ON i.itemid = f.itemid
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE e.source = 0
+        AND h.templateid IS NULL
+        AND h.flags = 0
+      GROUP BY e.eventid, e.clock, e.name, e.severity, e.value, e.acknowledged, h.name
+      ORDER BY e.clock DESC
+      LIMIT 50
+    `);
+  }
+
+  async getEventsByDay(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        DATE(FROM_UNIXTIME(e.clock)) as day,
+        COUNT(*) as total,
+        SUM(CASE WHEN e.value = 1 THEN 1 ELSE 0 END) as problems,
+        SUM(CASE WHEN e.value = 0 THEN 1 ELSE 0 END) as resolved
+      FROM events e
+      JOIN triggers t ON t.triggerid = e.objectid
+      JOIN functions f ON f.triggerid = t.triggerid
+      JOIN items i ON i.itemid = f.itemid
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE e.source = 0
+        AND h.templateid IS NULL
+        AND h.flags = 0
+        AND e.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+      GROUP BY DATE(FROM_UNIXTIME(e.clock))
+      ORDER BY day ASC
+    `);
+  }
+
+  async getProblemsByHost(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host_name,
+        COUNT(t.triggerid) as problem_count
+      FROM triggers t
+      JOIN functions f ON f.triggerid = t.triggerid
+      JOIN items i ON i.itemid = f.itemid
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE t.value = 1 
+        AND t.status = 0
+        AND h.templateid IS NULL
+        AND h.flags = 0
+      GROUP BY h.hostid, h.name
+      ORDER BY problem_count DESC
+      LIMIT 10
+    `);
+  }
+
+  async getCpuStats(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host_name,
+        (
+          SELECT value 
+          FROM history 
+          WHERE itemid = i.itemid 
+          ORDER BY clock DESC 
+          LIMIT 1
+        ) as cpu_utilization
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.key_ LIKE 'system.cpu.util%'
+        AND h.status = 0
+        AND h.templateid IS NULL
+      HAVING cpu_utilization IS NOT NULL
+      ORDER BY cpu_utilization DESC
+      LIMIT 10
+    `);
+  }
+
+  async getCpuDetails(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host_name,
+        (
+          SELECT value 
+          FROM history 
+          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.util%' LIMIT 1) 
+          ORDER BY clock DESC LIMIT 1
+        ) as cpu_utilization,
+        (
+          SELECT value 
+          FROM history 
+          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.load%' LIMIT 1) 
+          ORDER BY clock DESC LIMIT 1
+        ) as cpu_load,
+        (
+          SELECT value 
+          FROM history 
+          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE '%temp%' AND name LIKE '%CPU%' LIMIT 1) 
+          ORDER BY clock DESC LIMIT 1
+        ) as cpu_temperature,
+        (
+          SELECT value 
+          FROM history_uint 
+          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.num%' LIMIT 1) 
+          ORDER BY clock DESC LIMIT 1
+        ) as cpu_cores
+      FROM hosts h
+      WHERE h.status = 0
+        AND h.templateid IS NULL
+      HAVING cpu_utilization IS NOT NULL OR cpu_cores IS NOT NULL OR cpu_temperature IS NOT NULL
+      ORDER BY h.name ASC
+    `);
+  }
+
+  async getServiceAvailability(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host,
+        i.name as service_name,
+        i.itemid,
+        -- Current state
+        (SELECT hu.value FROM history_uint hu 
+         WHERE hu.itemid = i.itemid 
+         ORDER BY hu.clock DESC LIMIT 1) as current_state,
+        -- Number of incidents (non-zero values) in last 30 days
+        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hu.clock)))
+         FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value != 0
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as incident_days,
+        -- Last incident time
+        (SELECT FROM_UNIXTIME(MAX(hu.clock))
+         FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value != 0
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as last_incident
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.itemid IN (
+        64317, -- MSSQL$SAGE100
+        64336, -- SQLAgent$SAGE100
+        62724, -- NTDS
+        62703, -- DNS
+        62713, -- Kdc
+        62721, -- Netlogon DC-SRV
+        64319, -- Netlogon SAGE-SRV
+        62753  -- vmms
+      )
+      ORDER BY h.name, i.name
+    `);
+  }
+
+  async getAgentAvailability(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host,
+        -- Current availability (1=available, 2=unavailable, 0=unknown)
+        (SELECT hu.value FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         ORDER BY hu.clock DESC LIMIT 1) as current_status,
+        -- Average availability % over 30 days
+        ROUND(
+          (SELECT AVG(CASE WHEN hu.value = 1 THEN 1 ELSE 0 END) * 100
+           FROM history_uint hu
+           WHERE hu.itemid = i.itemid
+           AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+          ), 2
+        ) as availability_pct
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.itemid IN (
+        62658, -- Zabbix agent availability DC-SRV
+        64209  -- Zabbix agent availability SAGE-SRV
+      )
+      ORDER BY h.name
+    `);
+  }
+
+  async getAgentAvailabilityStats(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host,
+        i.itemid,
+        -- Current status
+        (SELECT hu.value FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         ORDER BY hu.clock DESC LIMIT 1) as current_status,
+        -- Availability % over 30 days
+        ROUND(
+          (SELECT AVG(CASE WHEN hu.value = 1 THEN 1.0 ELSE 0.0 END) * 100
+           FROM history_uint hu
+           WHERE hu.itemid = i.itemid
+           AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+          ), 4
+        ) as availability_pct,
+        -- Total checks
+        (SELECT COUNT(*) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as total_checks,
+        -- Unavailable count
+        (SELECT COUNT(*) FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value != 1
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as unavailable_checks,
+        -- Last unavailable time
+        (SELECT FROM_UNIXTIME(MAX(hu.clock))
+         FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value != 1
+         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as last_unavailable
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.itemid IN (62658, 64209)
+      ORDER BY h.name
+    `);
+  }
+
+  async getAgentAvailabilityHistory(
+    itemid: string,
+    from?: number,
+    to?: number,
+  ): Promise<unknown[]> {
+    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
+
+    return this.zabbixDataSource.query(
+      `
+      SELECT
+        DATE(FROM_UNIXTIME(clock)) as day,
+        ROUND(AVG(CASE WHEN value = 1 THEN 100.0 ELSE 0.0 END), 2) as availability_pct,
+        SUM(CASE WHEN value != 1 THEN 1 ELSE 0 END) as outages
+      FROM history_uint
+      WHERE itemid = ?
+        AND clock >= ?
+        AND clock <= ?
+      GROUP BY DATE(FROM_UNIXTIME(clock))
+      ORDER BY day ASC
+    `,
+      [itemid, fromTs, toTs],
+    );
+  }
+
+  async getAgentAvailablePeriods(
+    itemid: string,
+  ): Promise<{ year: number; month: number }[]> {
+    const raw: Array<{ year: number | string; month: number | string }> =
+      await this.zabbixDataSource.query(
+        `
+    SELECT
+      YEAR(FROM_UNIXTIME(clock)) as year,
+      MONTH(FROM_UNIXTIME(clock)) as month
+    FROM history_uint
+    WHERE itemid = ?
+    GROUP BY year, month
+    ORDER BY year DESC, month DESC
+    `,
+        [itemid],
+      );
+
+    return raw.map((r) => ({
+      year: Number(r.year),
+      month: Number(r.month),
+    }));
+  }
+
+  async getUptimeStats(): Promise<unknown[]> {
+    return this.zabbixDataSource.query(`
+      SELECT
+        h.name as host,
+        i.itemid,
+        -- Current uptime in seconds (latest value)
+        (SELECT CAST(hi.value AS UNSIGNED) FROM history hi
+         WHERE hi.itemid = i.itemid
+         ORDER BY hi.clock DESC LIMIT 1) as current_uptime_seconds,
+        -- Last restart time = when uptime last dropped below 300 seconds
+        (SELECT FROM_UNIXTIME(hi.clock)
+         FROM history hi
+         WHERE hi.itemid = i.itemid
+         AND hi.value < 300
+         AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         ORDER BY hi.clock ASC LIMIT 1) as last_restart_time,
+        -- Number of restarts in 30 days = number of times uptime dropped below 300
+        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hi.clock)))
+         FROM history hi
+         WHERE hi.itemid = i.itemid
+         AND hi.value < 300
+         AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        ) as restart_count
+      FROM items i
+      JOIN hosts h ON h.hostid = i.hostid
+      WHERE i.itemid IN (62651, 64202)
+      ORDER BY h.name
+    `);
+  }
+
+  async getUptimeHistory(
+    itemid: string,
+    from?: number,
+    to?: number,
+  ): Promise<unknown[]> {
+    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
+
+    return this.zabbixDataSource.query(
+      `
+      SELECT
+        DATE(FROM_UNIXTIME(clock)) as day,
+        MAX(CAST(value AS UNSIGNED)) as max_uptime_seconds,
+        MIN(CAST(value AS UNSIGNED)) as min_uptime_seconds,
+        CASE WHEN MIN(CAST(value AS UNSIGNED)) < 300 THEN 1 ELSE 0 END as had_restart
+      FROM history
+      WHERE itemid = ?
+        AND clock >= ?
+        AND clock <= ?
+      GROUP BY DATE(FROM_UNIXTIME(clock))
+      ORDER BY day ASC
+    `,
+      [itemid, fromTs, toTs],
+    );
+  }
+
+  async getUptimeAvailablePeriods(
+    itemid: string,
+  ): Promise<{ year: number; month: number }[]> {
+    const raw: Array<{ year: number | string; month: number | string }> =
+      await this.zabbixDataSource.query(
+        `
+      SELECT
+        YEAR(FROM_UNIXTIME(clock)) as year,
+        MONTH(FROM_UNIXTIME(clock)) as month
+      FROM history
+      WHERE itemid = ?
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+    `,
+        [itemid],
+      );
+    return raw.map((r) => ({
+      year: Number(r.year),
+      month: Number(r.month),
+    }));
+  }
+
+  async getServiceHistory(
+    itemid: string,
+    from?: string,
+    to?: string,
+  ): Promise<{ time: string; value: number }[]> {
+    let query = `
+      SELECT
+        hu.clock as clock,
+        hu.value as value
+      FROM history_uint hu
+      WHERE hu.itemid = ?
+    `;
+    const params: any[] = [itemid];
+
+    if (from !== undefined && from !== '') {
+      query += ` AND hu.clock >= ?`;
+      params.push(Number(from));
+    } else {
+      const defaultFrom = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+      query += ` AND hu.clock >= ?`;
+      params.push(defaultFrom);
+    }
+
+    if (to !== undefined && to !== '') {
+      query += ` AND hu.clock <= ?`;
+      params.push(Number(to));
+    }
+
+    query += ` ORDER BY hu.clock ASC`;
+
+    const raw: Array<{ clock: number; value: number | string }> =
+      await this.zabbixDataSource.query(query, params);
+    return raw.map((row) => ({
+      time: new Date(row.clock * 1000).toISOString(),
+      value: Number(row.value),
+    }));
+  }
+
+  async getServiceAvailablePeriods(
+    itemid: string,
+  ): Promise<{ year: number; month: number }[]> {
+    const raw: Array<{ year: number | string; month: number | string }> =
+      await this.zabbixDataSource.query(
+        `
+      SELECT 
+        YEAR(FROM_UNIXTIME(clock)) as year,
+        MONTH(FROM_UNIXTIME(clock)) as month
+      FROM history_uint
+      WHERE itemid = ?
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+    `,
+        [itemid],
+      );
+    return raw.map((r) => ({
+      year: Number(r.year),
+      month: Number(r.month),
+    }));
+  }
+}

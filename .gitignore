@@ -1,0 +1,32 @@
+# Large SQL dump files (too large for GitHub)
+zabbix_test.sql
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+*.env.local
+
+# Node modules
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,23 @@
+services:
+  db1:
+    image: mariadb:11
+    container_name: app1_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app1_db
+      MYSQL_USER: reporter
+      MYSQL_PASSWORD: reporterpass
+    ports:
+      - "3307:3306"
+
+  db2:
+    image: mariadb:11
+    container_name: app2_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: reporter
+      MYSQL_PASSWORD: reporterpass
+    ports:
+      - "3308:3306"
+    command: ["--innodb-buffer-pool-size=1G", "--max-allowed-packet=512M", "--innodb-log-file-size=256M"]

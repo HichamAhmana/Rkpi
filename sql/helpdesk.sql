@@ -1,0 +1,42 @@
+CREATE DATABASE IF NOT EXISTS app1_db;
+USE app1_db;
+
+CREATE TABLE Categories (
+    CategoryID INT AUTO_INCREMENT PRIMARY KEY,
+    CategoryName VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Agents (
+    AgentID INT AUTO_INCREMENT PRIMARY KEY,
+    FullName VARCHAR(150) NOT NULL,
+    Email VARCHAR(150),
+    Team VARCHAR(100)
+);
+
+CREATE TABLE Tickets (
+    TicketID INT AUTO_INCREMENT PRIMARY KEY,
+    Title VARCHAR(255) NOT NULL,
+    Description TEXT,
+    CategoryID INT,
+    AgentID INT,
+    Priority VARCHAR(20),
+    Status VARCHAR(20),
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ResolvedAt DATETIME NULL,
+    FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID),
+    FOREIGN KEY (AgentID) REFERENCES Agents(AgentID)
+);
+
+CREATE TABLE Services (
+    ServiceID INT AUTO_INCREMENT PRIMARY KEY,
+    ServiceName VARCHAR(150)
+);
+
+CREATE TABLE ServiceRequests (
+    RequestID INT AUTO_INCREMENT PRIMARY KEY,
+    TicketID INT,
+    ServiceID INT,
+    RequestDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TicketID) REFERENCES Tickets(TicketID),
+    FOREIGN KEY (ServiceID) REFERENCES Services(ServiceID)
+);
