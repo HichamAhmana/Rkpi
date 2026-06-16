@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ChevronDown, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Activity } from 'lucide-react';
 import {
   getAgentAvailabilityHistory,
   getAgentAvailablePeriods,
@@ -23,7 +23,19 @@ const formatLastOutage = (dateStr: string | null): string => {
   const month = date.toLocaleString('en-GB', { month: 'short' });
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day} ${month} · ${hours}:${minutes}`;
+  return `${day} ${month} ${hours}:${minutes}`;
+};
+
+const formatLastOutageFull = (dateStr: string | null): string => {
+  if (!dateStr) return 'No outages in 30 days';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const day = date.getDate();
+  const month = date.toLocaleString('en-GB', { month: 'short' });
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year} at ${hours}:${minutes}`;
 };
 
 const getColorForAvailability = (pct: number) => {
@@ -33,6 +45,46 @@ const getColorForAvailability = (pct: number) => {
 };
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
+
+/* ─────────────────── Availability Ring ─────────────────── */
+
+const AvailabilityRing: React.FC<{ percentage: number; color: string; size?: number }> = ({
+  percentage,
+  color,
+  size = 64,
+}) => {
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#F1F5F9"
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+      />
+    </svg>
+  );
+};
+
+/* ─────────────────── Expanded Panel ─────────────────── */
 
 interface ExpandedAgentPanelProps {
   agent: AgentStat;
@@ -70,7 +122,6 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
   const years = Array.from(new Set(periods.map(p => p.year))).sort((a, b) => b - a);
   const monthsForSelectedYear = periods.filter(p => p.year === selectedYear).map(p => p.month).sort((a, b) => b - a);
 
-  // Determine the cache key and time range for the current selection
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
       const to = Math.floor(Date.now() / 1000);
@@ -84,14 +135,13 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
     return null;
   }, [itemid, activePreset, selectedYear, selectedMonth]);
 
-  // Fetch data if needed
   useEffect(() => {
     if (!currentSelectionParams) return;
     
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
       setError(false);
-      return; // Already cached
+      return;
     }
 
     let isMounted = true;
@@ -116,7 +166,6 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
     return () => { isMounted = false; };
   }, [currentSelectionParams, customHistoryCache, setCustomHistoryCache, itemid, activePreset]);
 
-  // Resolve current history to display
   let currentHistory: AgentHistoryPoint[] = [];
   if (currentSelectionParams && customHistoryCache[currentSelectionParams.key]) {
     currentHistory = customHistoryCache[currentSelectionParams.key];
@@ -145,7 +194,7 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
 
   // Chart Configuration
   const chartData = currentHistory.map(pt => ({
-    x: pt.day, // raw ISO string from DB, we format in ApexCharts
+    x: pt.day,
     y: Number(pt.availability_pct),
     outages: Number(pt.outages)
   }));
@@ -160,14 +209,14 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
     chart: {
       type: 'bar',
       toolbar: { show: false },
-      animations: { enabled: false },
+      animations: { enabled: true, speed: 600 },
       fontFamily: 'Inter, sans-serif',
     },
     colors: barColors,
     plotOptions: {
       bar: {
-        borderRadius: 2,
-        columnWidth: '60%',
+        borderRadius: 3,
+        columnWidth: '55%',
         distributed: true,
       }
     },
@@ -178,6 +227,7 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
       strokeDashArray: 4,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
+      padding: { left: 8, right: 8 },
     },
     xaxis: {
       type: 'datetime',
@@ -188,7 +238,9 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0,3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '11px' }
+        style: { colors: '#94A3B8', fontSize: '10px' },
+        rotate: -45,
+        rotateAlways: false,
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -208,177 +260,180 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
         const date = new Date(data.x);
         const dayStr = `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
         return `
-          <div class="px-3 py-2 bg-white shadow-lg rounded border border-[#E2E8F0] text-[12px] text-[#0F172A]">
-            <div class="font-bold mb-1">${dayStr}</div>
-            <div><span class="font-semibold text-[#64748B]">Available:</span> ${data.y}%</div>
-            <div><span class="font-semibold text-[#64748B]">Outages:</span> ${data.outages}</div>
+          <div style="padding:8px 12px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.12);border-radius:8px;border:1px solid #E2E8F0;font-size:12px;color:#0F172A">
+            <div style="font-weight:700;margin-bottom:4px">${dayStr}</div>
+            <div><span style="color:#64748B">Available:</span> ${data.y}%</div>
+            <div><span style="color:#64748B">Outages:</span> ${data.outages}</div>
           </div>
         `;
       }
     }
   };
 
-  const series = [{
-    name: 'Availability',
-    data: chartData
-  }];
+  const series = [{ name: 'Availability', data: chartData }];
 
   const periodLabel = activePreset ? `Last ${activePreset} days` : (selectedYear && selectedMonth ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range');
 
   const currentStatusLabel = String(agent.current_status) === '1' ? 'Available' : 'Unavailable';
-  const currentStatusDot = String(agent.current_status) === '1' ? '#3DBE7A' : '#EF4444';
+  const currentStatusColor = String(agent.current_status) === '1' ? '#3DBE7A' : '#EF4444';
+
+  const totalOutagesInPeriod = currentHistory.reduce((sum, pt) => sum + Number(pt.outages), 0);
+
+  let interpretationText = '';
+  let interpretationIcon = '✅';
+  if (totalOutagesInPeriod === 0) {
+    interpretationText = `Perfect availability. No outages detected in the selected period.`;
+    interpretationIcon = '✅';
+  } else if (totalOutagesInPeriod <= 3) {
+    interpretationText = `${totalOutagesInPeriod} outage event${totalOutagesInPeriod > 1 ? 's' : ''} detected. Minor impact on overall availability.`;
+    interpretationIcon = '⚡';
+  } else {
+    interpretationText = `${totalOutagesInPeriod} outage events detected. Review agent health and network connectivity.`;
+    interpretationIcon = '⚠️';
+  }
 
   return (
-    <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-5 px-6 flex flex-col md:flex-row gap-8 overflow-hidden transition-all duration-300">
-      
-      {/* Left side — Stats summary */}
-      <div className="w-full md:w-[30%] flex flex-col">
-        
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Current status</span>
-            <div className="flex items-center gap-2">
-               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: currentStatusDot }} />
-               <span className="text-[14px] font-semibold text-[#0F172A]">{currentStatusLabel}</span>
+    <div
+      className="overflow-hidden transition-all duration-500 ease-out"
+      style={{ animation: 'slideDown 0.4s ease-out' }}
+    >
+      <div className="border-t border-[#E2E8F0]" />
+
+      <div className="p-5 bg-gradient-to-b from-[#F8FAFC] to-white">
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          {[
+            { label: 'Current Status', value: currentStatusLabel, icon: Shield, color: currentStatusColor },
+            { label: 'Total Checks', value: formatNumber(agent.total_checks), icon: Activity, color: '#2B5BA8' },
+            { label: 'Outages (30d)', value: formatNumber(agent.unavailable_checks), icon: AlertTriangle, color: agent.unavailable_checks > 0 ? '#F59E0B' : '#3DBE7A' },
+            { label: 'Last Outage', value: formatLastOutageFull(agent.last_unavailable), icon: Clock, color: !agent.last_unavailable ? '#3DBE7A' : '#F59E0B' },
+          ].map((metric, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2.5 p-3 bg-white rounded-lg border border-[#E2E8F0]
+                hover:shadow-sm transition-shadow duration-200"
+            >
+              <div
+                className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ backgroundColor: `${metric.color}15` }}
+              >
+                <metric.icon className="w-3.5 h-3.5" style={{ color: metric.color }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
+                <p className="text-[13px] font-bold text-[#0F172A] truncate">{metric.value}</p>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Availability (30d)</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
-              {Number(agent.availability_pct).toFixed(4)}%
-            </span>
-          </div>
-
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Total checks (30d)</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
-              {formatNumber(agent.total_checks)}
-            </span>
-          </div>
-          
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Outage occurrences (30d)</span>
-            <span className={`text-[14px] font-bold ${agent.unavailable_checks === 0 ? 'text-[#3DBE7A]' : 'text-[#F59E0B]'}`}>
-              {formatNumber(agent.unavailable_checks)}
-            </span>
-          </div>
-
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Last outage</span>
-            <span className={`text-[14px] font-bold ${!agent.last_unavailable ? 'text-[#3DBE7A]' : 'text-[#0F172A]'}`}>
-              {formatLastOutage(agent.last_unavailable)}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Monitoring period</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
-              {periodLabel}
-            </span>
-          </div>
+          ))}
         </div>
-      </div>
 
-      {/* Right side — Full chart & Selector */}
-      <div className="w-full md:w-[70%] flex flex-col">
-        
-        {/* Header with Title and Selector */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
-          <div>
-            <h4 className="text-[14px] font-semibold text-[#0F172A] mb-0.5">
-              {agent.host} — Daily Agent Availability
-            </h4>
-            <p className="text-[12px] text-[#94A3B8]">
-              Each bar = 1 day. Green = 100%, Orange = degraded, Red = critical
-            </p>
-          </div>
+        {/* Chart Section */}
+        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+          {/* Chart Header */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 border-b border-[#F1F5F9] gap-3">
+            <div>
+              <h4 className="text-[13px] font-semibold text-[#0F172A]">
+                Daily Availability — {periodLabel}
+              </h4>
+              <div className="flex items-center gap-4 mt-1">
+                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <span className="w-2 h-2 rounded-sm bg-[#3DBE7A]" /> 100%
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <span className="w-2 h-2 rounded-sm bg-[#F59E0B]" /> Degraded
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <span className="w-2 h-2 rounded-sm bg-[#EF4444]" /> Critical
+                </span>
+              </div>
+            </div>
 
-          {/* Time Range Selector */}
-          <div className="flex flex-col items-end gap-1.5">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Presets */}
-              <div className="flex items-center bg-[#F1F5F9] rounded-lg p-1">
+            {/* Time Range Selector */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center bg-[#F1F5F9] rounded-lg p-0.5">
                 {[7, 15, 30].map(days => (
                   <button
                     key={days}
                     onClick={() => handlePresetClick(days)}
-                    className={`px-3 py-1 text-[12px] font-medium rounded-md transition-colors ${
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${
                       activePreset === days
-                        ? 'bg-[#2B5BA8] text-white shadow-sm'
-                        : 'text-[#64748B] hover:bg-[#E2E8F0]'
+                        ? 'bg-[#3A9DBF] text-white shadow-sm'
+                        : 'text-[#64748B] hover:bg-white hover:shadow-sm'
                     }`}
                   >
-                    {days} days
+                    {days}d
                   </button>
                 ))}
               </div>
 
-              <div className="w-[1px] h-6 bg-[#E2E8F0]" />
+              <div className="w-px h-5 bg-[#E2E8F0]" />
 
-              {/* Dropdowns */}
-              <div className="flex items-center gap-2">
-                <select
-                  className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                  value={selectedYear || ''}
-                  onChange={handleYearChange}
-                >
-                  <option value="" disabled>Year</option>
-                  {years.map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
+              <select
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3A9DBF] cursor-pointer"
+                value={selectedYear || ''}
+                onChange={handleYearChange}
+              >
+                <option value="" disabled>Year</option>
+                {years.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
 
-                <select
-                  className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                  value={selectedMonth || ''}
-                  onChange={handleMonthChange}
-                  disabled={!selectedYear}
-                >
-                  <option value="" disabled>Month</option>
-                  {monthsForSelectedYear.map(m => (
-                    <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3A9DBF] cursor-pointer"
+                value={selectedMonth || ''}
+                onChange={handleMonthChange}
+                disabled={!selectedYear}
+              >
+                <option value="" disabled>Month</option>
+                {monthsForSelectedYear.map(m => (
+                  <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
+                ))}
+              </select>
             </div>
-            
-            <span className="text-[11px] font-medium text-[#2B5BA8] bg-[rgba(43,91,168,0.1)] px-2 py-0.5 rounded-full">
-              {activePreset ? `Showing last ${activePreset} days from today` : (selectedYear && selectedMonth ? `Showing: ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range')}
-            </span>
+          </div>
+
+          {/* Chart Area */}
+          <div className="h-[220px] w-full px-2">
+            {loading ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[#3A9DBF] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[11px] text-[#94A3B8]">Loading chart data...</span>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="w-full h-full flex flex-col items-center justify-center">
+                <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
+                <button 
+                  onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
+                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded-md hover:bg-[#E2E8F0] transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : chartData.length === 0 ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
+              </div>
+            ) : (
+              <Chart options={chartOptions} series={series} type="bar" width="100%" height="100%" />
+            )}
           </div>
         </div>
 
-        {/* Chart Area */}
-        <div className="h-[200px] w-full relative">
-          {loading ? (
-            <div className="w-full h-full flex items-center justify-center">
-               <div className="skeleton w-full h-[180px] rounded-lg" />
-            </div>
-          ) : error ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-              <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
-              <button 
-                onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
-                className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          ) : chartData.length === 0 ? (
-            <div className="w-full h-full flex items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-              <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
-            </div>
-          ) : (
-            <Chart options={chartOptions} series={series} type="bar" width="100%" height="100%" />
-          )}
+        {/* Interpretation */}
+        <div className="mt-3 flex items-start gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg">
+          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <p className="text-[12px] text-[#475569] leading-relaxed">{interpretationText}</p>
         </div>
       </div>
-
     </div>
   );
 };
 
+
+/* ─────────────────── Agent Card ─────────────────── */
 
 interface AgentCardProps {
   agent: AgentStat;
@@ -403,58 +458,99 @@ const AgentCard: React.FC<AgentCardProps> = ({
   const color = getColorForAvailability(pctNum);
   const availableChecks = agent.total_checks - agent.unavailable_checks;
 
+  const isAvailable = String(agent.current_status) === '1';
+
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-sm flex flex-col">
-      {/* Header Area (Clickable) */}
-      <div 
-        className="p-6 cursor-pointer hover:bg-[#FAFBFF] transition-colors duration-150 border-l-[4px]"
-        style={{ borderLeftColor: '#3A9DBF' }}
+    <div
+      className={`bg-white rounded-xl overflow-hidden transition-all duration-300 ease-out
+        ${isExpanded ? 'shadow-lg ring-1 ring-[#3A9DBF]/20' : 'shadow-sm hover:shadow-md border border-[#E2E8F0]'}`}
+    >
+      {/* Collapsed Header */}
+      <div
+        className="cursor-pointer select-none transition-colors duration-200 hover:bg-[#FAFCFF] p-5 flex flex-col gap-4"
         onClick={onToggle}
       >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-[18px] font-bold text-[#0F172A]">{agent.host}</h3>
-            <p className="text-[13px] text-[#94A3B8]">Zabbix Agent Availability</p>
+        {/* Top Row: Agent Name & Status Badge + Chevron */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#F1F5F9] text-[#64748B] flex-shrink-0">
+              <Shield className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex items-center gap-2.5">
+              <h3 className="text-[16px] font-bold text-[#0F172A] truncate">{agent.host}</h3>
+              <span
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  backgroundColor: isAvailable ? '#F0FDF4' : '#FEF2F2',
+                  color: isAvailable ? '#15803d' : '#EF4444',
+                }}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${!isAvailable ? 'animate-pulse' : ''}`}
+                  style={{ backgroundColor: isAvailable ? '#15803d' : '#EF4444' }}
+                />
+                {isAvailable ? 'Available' : 'Unavailable'}
+              </span>
+            </div>
           </div>
-          <div className="text-[#94A3B8]">
-             {isExpanded ? (
-               <ChevronUp className="w-5 h-5 transition-transform duration-200" />
-             ) : (
-               <ChevronDown className="w-5 h-5 transition-transform duration-200" />
-             )}
+
+          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F1F5F9] transition-colors flex-shrink-0">
+            <ChevronDown
+              className={`w-4 h-4 text-[#64748B] transition-transform duration-300 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-end gap-2">
-            <span className="text-[36px] font-bold leading-none tracking-tight" style={{ color }}>
-              {pctNum.toFixed(2)}%
-            </span>
+        {/* Middle Row: Ring + Hero percentage */}
+        <div className="flex items-center gap-4">
+          {/* Availability Ring */}
+          <div className="relative flex-shrink-0">
+            <AvailabilityRing percentage={pctNum} color={color} size={56} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-[#64748B]">{Math.round(pctNum)}%</span>
+            </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full h-[8px] bg-[#E2E8F0] rounded-full overflow-hidden">
-            <div 
-              className="h-full rounded-full transition-all duration-1000 ease-out"
-              style={{ width: `${pctNum}%`, backgroundColor: color }}
-            />
-          </div>
+          {/* Availability Hero percentage */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-0.5 mb-1.5">
+              <span className="text-[24px] font-extrabold tabular-nums leading-none" style={{ color }}>
+                {pctNum.toFixed(2)}
+              </span>
+              <span className="text-[13px] font-extrabold" style={{ color }}>%</span>
+              <span className="text-[11px] text-[#94A3B8] ml-1.5 font-semibold">availability</span>
+            </div>
 
-          {/* Stat Pills */}
-          <div className="flex flex-wrap gap-3 mt-1">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] shadow-sm">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#3DBE7A]" />
-              <span className="text-[12px] text-[#475569]">Available: <strong className="text-[#0F172A]">{formatNumber(availableChecks)}</strong></span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] shadow-sm">
-              <XCircle className="w-3.5 h-3.5 text-[#EF4444]" />
-              <span className="text-[12px] text-[#475569]">Outages: <strong className="text-[#0F172A]">{formatNumber(agent.unavailable_checks)}</strong></span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] shadow-sm">
-              <Clock className="w-3.5 h-3.5 text-[#64748B]" />
-              <span className="text-[12px] text-[#475569]">Last outage: <strong className={`text-[12px] font-bold ${!agent.last_unavailable ? 'text-[#3DBE7A]' : 'text-[#0F172A]'}`}>{formatLastOutage(agent.last_unavailable)}</strong></span>
+            {/* Compact progress bar */}
+            <div className="w-full h-[4px] bg-[#F1F5F9] rounded-full overflow-hidden max-w-[200px]">
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${pctNum}%`, backgroundColor: color }}
+              />
             </div>
           </div>
+        </div>
+
+        {/* Bottom Row: Mini Stat Pills (full card width grid) */}
+        <div className="grid grid-cols-3 gap-2.5 pt-3.5 border-t border-[#F1F5F9]">
+          {[
+            { label: 'AVAIL CHECKS', value: formatNumber(availableChecks), icon: CheckCircle2, iconColor: '#3DBE7A' },
+            { label: 'OUTAGES', value: formatNumber(agent.unavailable_checks), icon: XCircle, iconColor: '#EF4444' },
+            { label: 'LAST OUTAGE', value: formatLastOutage(agent.last_unavailable), icon: Clock, iconColor: '#64748B' },
+          ].map((pill, i) => (
+            <div
+              key={i}
+              className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]"
+            >
+              <div className="flex items-center gap-1 mb-1 max-w-full justify-center">
+                <pill.icon className="w-3 h-3 flex-shrink-0" style={{ color: pill.iconColor }} />
+                <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold truncate">{pill.label}</span>
+              </div>
+              <span className="text-[12px] font-extrabold text-[#0F172A] whitespace-nowrap truncate w-full text-center">{pill.value}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -473,6 +569,8 @@ const AgentCard: React.FC<AgentCardProps> = ({
 };
 
 
+/* ─────────────────── Section ─────────────────── */
+
 interface AgentAvailabilitySectionProps {
   data: AgentStat[];
 }
@@ -480,7 +578,6 @@ interface AgentAvailabilitySectionProps {
 const AgentAvailabilitySection: React.FC<AgentAvailabilitySectionProps> = ({ data }) => {
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
 
-  // Lifted caches for periods and custom history to persist across toggles
   const [availablePeriodsCache, setAvailablePeriodsCache] = useState<Record<number, AvailablePeriod[]>>({});
   const [customHistoryCache, setCustomHistoryCache] = useState<Record<string, AgentHistoryPoint[]>>({});
 
@@ -490,14 +587,22 @@ const AgentAvailabilitySection: React.FC<AgentAvailabilitySectionProps> = ({ dat
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 transition-all duration-300">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="w-1 h-5 rounded-full bg-[#3A9DBF]" />
+        <h3 className="text-[15px] font-semibold text-[#0F172A]">Agent Availability</h3>
+        <span className="text-[11px] text-[#94A3B8] font-medium ml-1">
+          {data.length} {data.length === 1 ? 'agent' : 'agents'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 transition-all duration-300">
         {data.map(agent => {
           const isExpanded = expandedItemId === agent.itemid;
           return (
             <div
               key={agent.itemid}
-              className={`transition-all duration-300 ${
-                isExpanded ? 'xl:col-span-2' : 'xl:col-span-1'
+              className={`transition-all duration-300 ease-out ${
+                isExpanded ? 'lg:col-span-2' : 'lg:col-span-1'
               }`}
             >
               <AgentCard 

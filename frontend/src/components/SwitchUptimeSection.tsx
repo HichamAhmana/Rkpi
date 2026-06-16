@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Network } from 'lucide-react';
 import {
   getSwitchUptimeHistory,
   getSwitchUptimeAvailablePeriods,
@@ -488,111 +488,79 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
       ? Number(((stat.up_ports / stat.total_ports) * 100).toFixed(1))
       : 0;
 
-  const pill =
-    stat.restart_count === 0
-      ? { label: '🟢 Stable', bg: '#F0FDF4', color: '#15803d' }
-      : { label: '🟡 Restarted', bg: '#FFFBEB', color: '#B45309' };
+  const isStable = stat.restart_count === 0;
+  const statusColor = isStable ? '#10B981' : '#F59E0B';
+  const statusBg = isStable ? '#ECFDF5' : '#FFFBEB';
+  const statusText = isStable ? 'Stable' : 'Restarted';
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-sm flex flex-col">
-      {/* Card header — always visible, clickable */}
+    <div
+      className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 ease-out flex flex-col
+        ${isExpanded ? 'shadow-lg ring-1 ring-[#2563B0]/20' : 'shadow-sm hover:shadow-md border-[#E2E8F0]'}`}
+    >
+      {/* Card Header (clickable) */}
       <div
-        className="p-5 cursor-pointer hover:bg-[#FAFBFF] transition-colors duration-150 border-l-[4px]"
-        style={{ borderLeftColor: '#2563B0' }}
+        className="p-5 cursor-pointer select-none transition-colors duration-200 hover:bg-[#FAFCFF] flex flex-col gap-4"
         onClick={onToggle}
       >
-        {/* Top row: name + pill + chevron */}
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="text-[18px] font-bold text-[#0F172A]">{stat.switch_name}</h3>
-            <p className="text-[13px] text-[#94A3B8]">Network Switch</p>
+        {/* Top Row: Name & Status badge + Chevron */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div 
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{
+                backgroundColor: isStable ? '#ECFDF5' : '#FFFBEB',
+                color: statusColor
+              }}
+            >
+              <Network className="w-4.5 h-4.5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[16px] font-bold text-[#0F172A] truncate">{stat.switch_name}</h3>
+              <p className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">Network Switch</p>
+            </div>
           </div>
+          
           <div className="flex items-center gap-3">
             <span
-              className="inline-flex items-center text-[12px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: pill.bg, color: pill.color }}
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: statusBg, color: statusColor }}
             >
-              {pill.label}
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${!isStable ? 'animate-pulse' : ''}`}
+                style={{ backgroundColor: statusColor }}
+              />
+              {statusText}
             </span>
-            <div className="text-[#94A3B8]">
-              {isExpanded
-                ? <ChevronUp className="w-5 h-5 transition-transform duration-200" />
-                : <ChevronDown className="w-5 h-5 transition-transform duration-200" />}
+
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F1F5F9] hover:bg-[#E2E8F0] transition-colors flex-shrink-0"
+            >
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-[#64748B]" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#64748B]" />
+              )}
             </div>
           </div>
         </div>
 
-        {/* Uptime display */}
-        <div className="mb-4">
-          <div className="text-[28px] font-bold leading-none tracking-tight text-[#0F172A] mb-1">
+        {/* Middle Row: Uptime display */}
+        <div>
+          <div className="text-[24px] font-extrabold text-[#0F172A] mb-0.5 leading-none">
             {formatUptimeFull(stat.current_uptime_seconds)}
           </div>
-          <div className="text-[13px] text-[#94A3B8]">
+          <div className="text-[11px] text-[#94A3B8]">
             Since {formatBootDateShort(stat.current_uptime_seconds)}
           </div>
         </div>
 
-        {/* Stats row — 5 boxes */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[58px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Last</span>
-            <span className="text-[12px] font-bold text-[#3DBE7A]">
-              {formatUptimeShort(stat.current_uptime_seconds)}
-            </span>
-          </div>
-
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[58px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Min</span>
-            <span
-              className="text-[12px] font-bold"
-              style={{
-                color:
-                  stat.min_uptime_seconds !== null &&
-                  stat.min_uptime_seconds < stat.current_uptime_seconds * 0.5
-                    ? '#F59E0B'
-                    : '#3DBE7A',
-              }}
-            >
-              {stat.min_uptime_seconds !== null
-                ? formatUptimeShort(stat.min_uptime_seconds)
-                : '—'}
-            </span>
-          </div>
-
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[58px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Restarts</span>
-            <span
-              className="text-[12px] font-bold"
-              style={{ color: stat.restart_count > 0 ? '#EF4444' : '#3DBE7A' }}
-            >
-              {stat.restart_count}
-            </span>
-          </div>
-
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[58px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Ports Up</span>
-            <span className="text-[12px] font-bold text-[#3DBE7A]">
-              {stat.up_ports}/{stat.total_ports}
-            </span>
-          </div>
-
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[58px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Ports Down</span>
-            <span
-              className="text-[12px] font-bold"
-              style={{ color: stat.down_ports > 0 ? '#EF4444' : '#3DBE7A' }}
-            >
-              {stat.down_ports}
-            </span>
-          </div>
-        </div>
-
-        {/* Port availability progress bar */}
-        <div>
+        {/* Port Availability progress bar */}
+        <div className="bg-[#F8FAFC] border border-[#F1F5F9] p-3.5 rounded-xl">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-[12px] text-[#64748B]">Port availability</span>
-            <span className="text-[12px] font-semibold text-[#0F172A]">
-              {stat.up_ports}/{stat.total_ports} — {portPct}%
+            <span className="text-[10px] uppercase tracking-wider text-[#94A3B8] font-bold">Port Connectivity</span>
+            <span className="text-[12px] font-extrabold text-[#0F172A]">
+              {stat.up_ports}/{stat.total_ports} ports &middot; {portPct}%
             </span>
           </div>
           <div className="w-full h-[6px] bg-[#E2E8F0] rounded-full overflow-hidden">
@@ -604,6 +572,45 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
               }}
             />
           </div>
+        </div>
+
+        {/* Bottom Row: Mini Stat Pills (full card width grid - 4 columns) */}
+        <div className="grid grid-cols-4 gap-2 pt-3.5 border-t border-[#F1F5F9]">
+          {[
+            { 
+              label: 'MIN UPTIME', 
+              value: stat.min_uptime_seconds !== null ? formatUptimeShort(stat.min_uptime_seconds) : '—',
+              color: stat.min_uptime_seconds !== null && stat.min_uptime_seconds < stat.current_uptime_seconds * 0.5 ? '#F59E0B' : '#0F172A'
+            },
+            { 
+              label: 'RESTARTS', 
+              value: String(stat.restart_count),
+              color: stat.restart_count > 0 ? '#EF4444' : '#3DBE7A',
+            },
+            { 
+              label: 'PORTS UP', 
+              value: `${stat.up_ports}/${stat.total_ports}`,
+              color: '#3DBE7A'
+            },
+            { 
+              label: 'PORTS DOWN', 
+              value: String(stat.down_ports),
+              color: stat.down_ports > 0 ? '#EF4444' : '#3DBE7A',
+            },
+          ].map((pill, i) => (
+            <div
+              key={i}
+              className="flex flex-col items-center py-2 px-1 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]"
+            >
+              <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">{pill.label}</span>
+              <span 
+                className="text-[12px] font-extrabold truncate w-full text-center"
+                style={{ color: pill.color }}
+              >
+                {pill.value}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

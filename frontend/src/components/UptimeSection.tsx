@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, Clock, RotateCcw, Zap, Calendar, Server } from 'lucide-react';
 import {
   getUptimeHistory,
   getUptimeAvailablePeriods,
@@ -42,7 +42,14 @@ const formatUptimeFull = (seconds: number): string => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return `${d} days, ${h}h ${m}m`;
+  return `${d}d ${h}h ${m}m`;
+};
+
+const formatUptimeHero = (seconds: number): { days: number; hours: number; minutes: number } => {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return { days: d, hours: h, minutes: m };
 };
 
 const formatUptimeShort = (seconds: number): string => {
@@ -56,6 +63,51 @@ const formatUptimeShort = (seconds: number): string => {
 };
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
+
+// Uptime percentage for visual ring (based on 30-day period)
+const getUptimePercentage = (seconds: number): number => {
+  const thirtyDays = 30 * 86400;
+  return Math.min(100, (seconds / thirtyDays) * 100);
+};
+
+/* ─────────────────────── Animated Ring ─────────────────────── */
+const UptimeRing: React.FC<{ percentage: number; color: string; size?: number }> = ({
+  percentage,
+  color,
+  size = 72,
+}) => {
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#F1F5F9"
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+      />
+    </svg>
+  );
+};
+
+/* ─────────────────── Expanded Panel ─────────────────── */
 
 interface ExpandedUptimePanelProps {
   stat: UptimeStat;
@@ -93,7 +145,6 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
   const years = Array.from(new Set(periods.map(p => p.year))).sort((a, b) => b - a);
   const monthsForSelectedYear = periods.filter(p => p.year === selectedYear).map(p => p.month).sort((a, b) => b - a);
 
-  // Determine the cache key and time range for the current selection
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
       const to = Math.floor(Date.now() / 1000);
@@ -107,14 +158,13 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     return null;
   }, [itemid, activePreset, selectedYear, selectedMonth]);
 
-  // Fetch data if needed
   useEffect(() => {
     if (!currentSelectionParams) return;
     
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
       setError(false);
-      return; // Already cached
+      return;
     }
 
     let isMounted = true;
@@ -139,7 +189,6 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     return () => { isMounted = false; };
   }, [currentSelectionParams, customHistoryCache, setCustomHistoryCache, itemid, activePreset]);
 
-  // Resolve current history to display
   let currentHistory: UptimeHistoryPoint[] = [];
   if (currentSelectionParams && customHistoryCache[currentSelectionParams.key]) {
     currentHistory = customHistoryCache[currentSelectionParams.key];
@@ -182,14 +231,14 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     chart: {
       type: 'bar',
       toolbar: { show: false },
-      animations: { enabled: false },
+      animations: { enabled: true, speed: 600 },
       fontFamily: 'Inter, sans-serif',
     },
     colors: barColors,
     plotOptions: {
       bar: {
-        borderRadius: 2,
-        columnWidth: '60%',
+        borderRadius: 3,
+        columnWidth: '55%',
         distributed: true,
       }
     },
@@ -200,6 +249,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
       strokeDashArray: 4,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
+      padding: { left: 8, right: 8 },
     },
     xaxis: {
       type: 'category',
@@ -209,7 +259,9 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0,3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '11px' }
+        style: { colors: '#94A3B8', fontSize: '10px' },
+        rotate: -45,
+        rotateAlways: false,
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -217,7 +269,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     yaxis: {
       min: 0,
       labels: {
-        formatter: (val) => `${val.toFixed(0)} days`,
+        formatter: (val) => `${val.toFixed(0)}d`,
         style: { colors: '#94A3B8', fontSize: '11px' }
       }
     },
@@ -225,15 +277,17 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
       yaxis: [
         {
           y: 1,
-          borderColor: '#94A3B8',
-          strokeDashArray: 4,
+          borderColor: '#CBD5E1',
+          strokeDashArray: 6,
           label: {
-            borderColor: '#94A3B8',
+            borderColor: 'transparent',
             style: {
-              color: '#fff',
-              background: '#94A3B8'
+              color: '#94A3B8',
+              background: 'transparent',
+              fontSize: '10px',
+              padding: { left: 4, right: 4, top: 2, bottom: 2 },
             },
-            text: '1 day threshold'
+            text: '1 day'
           }
         }
       ]
@@ -244,12 +298,12 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
         const date = new Date(data.x);
         const dayStr = `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
         const restartNotice = data.had_restart === 1 
-          ? `<div class="text-[#EF4444] font-semibold mt-1">↻ Server restarted this day</div>` 
+          ? `<div style="color:#EF4444;font-weight:600;margin-top:4px">↻ Server restarted</div>` 
           : '';
         return `
-          <div class="px-3 py-2 bg-white shadow-lg rounded border border-[#E2E8F0] text-[12px] text-[#0F172A]">
-            <div class="font-bold mb-1">${dayStr}</div>
-            <div><span class="font-semibold text-[#64748B]">Max uptime:</span> ${formatUptimeShort(data.max_uptime_seconds)}</div>
+          <div style="padding:8px 12px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.12);border-radius:8px;border:1px solid #E2E8F0;font-size:12px;color:#0F172A">
+            <div style="font-weight:700;margin-bottom:4px">${dayStr}</div>
+            <div><span style="color:#64748B">Max uptime:</span> ${formatUptimeShort(data.max_uptime_seconds)}</div>
             ${restartNotice}
           </div>
         `;
@@ -257,10 +311,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     }
   };
 
-  const series = [{
-    name: 'Uptime',
-    data: chartData
-  }];
+  const series = [{ name: 'Uptime', data: chartData }];
 
   const periodLabel = activePreset ? `Last ${activePreset} days` : (selectedYear && selectedMonth ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range');
   const bootDate = new Date(Date.now() - stat.current_uptime_seconds * 1000);
@@ -269,143 +320,139 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
   const currentPeriodRestarts = currentHistory.filter(pt => pt.had_restart === 1).length;
 
   let interpretationText = '';
+  let interpretationIcon = '✅';
   if (currentPeriodRestarts === 0) {
-    interpretationText = `• No restarts detected in the selected period. Server has been running continuously for ${formatUptimeFull(stat.current_uptime_seconds)}.`;
+    interpretationText = `No restarts detected. Server running continuously for ${formatUptimeFull(stat.current_uptime_seconds)}.`;
+    interpretationIcon = '✅';
   } else if (currentPeriodRestarts === 1) {
-    interpretationText = `• 1 restart detected on ${formatLastRestart(stat.last_restart_time)}. Uptime dropped briefly and recovered.`;
+    interpretationText = `1 restart detected on ${formatLastRestart(stat.last_restart_time)}. Uptime dropped briefly and recovered.`;
+    interpretationIcon = '⚡';
   } else {
-    interpretationText = `• ${currentPeriodRestarts} restarts detected. Review maintenance logs for planned/unplanned reboots.`;
+    interpretationText = `${currentPeriodRestarts} restarts detected. Review maintenance logs for planned/unplanned reboots.`;
+    interpretationIcon = '⚠️';
   }
 
   return (
-    <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-5 px-6 flex flex-col gap-6 overflow-hidden transition-all duration-300">
+    <div
+      className="overflow-hidden transition-all duration-500 ease-out"
+      style={{
+        animation: 'slideDown 0.4s ease-out',
+      }}
+    >
+      <div className="border-t border-[#E2E8F0]" />
       
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Left side — Stats summary */}
-        <div className="w-full md:w-[30%] flex flex-col">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-              <span className="text-[#94A3B8] text-[12px] mb-1">Current uptime</span>
-              <span className="text-[14px] font-bold text-[#0F172A]">
-                {formatUptimeFull(stat.current_uptime_seconds)}
-              </span>
+      <div className="p-5 bg-gradient-to-b from-[#F8FAFC] to-white">
+        {/* Stats Row — 4 mini metric cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          {[
+            { label: 'Current Uptime', value: formatUptimeShort(stat.current_uptime_seconds), icon: Clock, color: '#2B5BA8' },
+            { label: 'Boot Time', value: bootDateStr, icon: Calendar, color: '#3A9DBF' },
+            { label: 'Restarts (30d)', value: formatNumber(stat.restart_count), icon: RotateCcw, color: stat.restart_count > 0 ? '#EF4444' : '#3DBE7A' },
+            { label: 'Last Restart', value: formatLastRestartFull(stat.last_restart_time), icon: Zap, color: !stat.last_restart_time ? '#3DBE7A' : '#F59E0B' },
+          ].map((metric, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2.5 p-3 bg-white rounded-lg border border-[#E2E8F0]
+                hover:shadow-sm transition-shadow duration-200"
+            >
+              <div
+                className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ backgroundColor: `${metric.color}15` }}
+              >
+                <metric.icon className="w-3.5 h-3.5" style={{ color: metric.color }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
+                <p className="text-[13px] font-bold text-[#0F172A] truncate">{metric.value}</p>
+              </div>
             </div>
-            
-            <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-              <span className="text-[#94A3B8] text-[12px] mb-1">Last restart</span>
-              <span className={`text-[14px] font-bold ${!stat.last_restart_time ? 'text-[#3DBE7A]' : 'text-[#0F172A]'}`}>
-                {formatLastRestartFull(stat.last_restart_time)}
-              </span>
-            </div>
-
-            <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-              <span className="text-[#94A3B8] text-[12px] mb-1">Restart count (30d)</span>
-              <span className={`text-[14px] font-bold ${stat.restart_count > 0 ? 'text-[#EF4444]' : 'text-[#3DBE7A]'}`}>
-                {formatNumber(stat.restart_count)}
-              </span>
-            </div>
-            
-            <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-              <span className="text-[#94A3B8] text-[12px] mb-1">Boot time</span>
-              <span className="text-[14px] font-bold text-[#0F172A]">
-                {bootDateStr}
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-[#94A3B8] text-[12px] mb-1">Monitoring period</span>
-              <span className="text-[14px] font-bold text-[#0F172A]">
-                {periodLabel}
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Right side — Full chart & Selector */}
-        <div className="w-full md:w-[70%] flex flex-col">
-          
-          {/* Header with Title and Selector */}
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
+        {/* Chart Section */}
+        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+          {/* Chart Header */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 border-b border-[#F1F5F9] gap-3">
             <div>
-              <h4 className="text-[14px] font-semibold text-[#0F172A] mb-0.5">
-                {stat.host} — Uptime History (30 days)
+              <h4 className="text-[13px] font-semibold text-[#0F172A]">
+                Uptime History — {periodLabel}
               </h4>
-              <p className="text-[12px] text-[#94A3B8]">
-                Blue = stable day · Red = restart detected
-              </p>
+              <div className="flex items-center gap-4 mt-1">
+                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <span className="w-2 h-2 rounded-sm bg-[#2B5BA8]" /> Stable
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                  <span className="w-2 h-2 rounded-sm bg-[#EF4444]" /> Restart
+                </span>
+              </div>
             </div>
 
             {/* Time Range Selector */}
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center bg-[#F1F5F9] rounded-lg p-1">
-                  {[7, 15, 30].map(days => (
-                    <button
-                      key={days}
-                      onClick={() => handlePresetClick(days)}
-                      className={`px-3 py-1 text-[12px] font-medium rounded-md transition-colors ${
-                        activePreset === days
-                          ? 'bg-[#2B5BA8] text-white shadow-sm'
-                          : 'text-[#64748B] hover:bg-[#E2E8F0]'
-                      }`}
-                    >
-                      {days} days
-                    </button>
-                  ))}
-                </div>
-
-                <div className="w-[1px] h-6 bg-[#E2E8F0]" />
-
-                <div className="flex items-center gap-2">
-                  <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                    value={selectedYear || ''}
-                    onChange={handleYearChange}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center bg-[#F1F5F9] rounded-lg p-0.5">
+                {[7, 15, 30].map(days => (
+                  <button
+                    key={days}
+                    onClick={() => handlePresetClick(days)}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${
+                      activePreset === days
+                        ? 'bg-[#2B5BA8] text-white shadow-sm'
+                        : 'text-[#64748B] hover:bg-white hover:shadow-sm'
+                    }`}
                   >
-                    <option value="" disabled>Year</option>
-                    {years.map(yr => (
-                      <option key={yr} value={yr}>{yr}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                    value={selectedMonth || ''}
-                    onChange={handleMonthChange}
-                    disabled={!selectedYear}
-                  >
-                    <option value="" disabled>Month</option>
-                    {monthsForSelectedYear.map(m => (
-                      <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
-                    ))}
-                  </select>
-                </div>
+                    {days}d
+                  </button>
+                ))}
               </div>
-              
-              <span className="text-[11px] font-medium text-[#2B5BA8] bg-[rgba(43,91,168,0.1)] px-2 py-0.5 rounded-full">
-                {activePreset ? `Showing last ${activePreset} days from today` : (selectedYear && selectedMonth ? `Showing: ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range')}
-              </span>
+
+              <div className="w-px h-5 bg-[#E2E8F0]" />
+
+              <select
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
+                value={selectedYear || ''}
+                onChange={handleYearChange}
+              >
+                <option value="" disabled>Year</option>
+                {years.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+
+              <select
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
+                value={selectedMonth || ''}
+                onChange={handleMonthChange}
+                disabled={!selectedYear}
+              >
+                <option value="" disabled>Month</option>
+                {monthsForSelectedYear.map(m => (
+                  <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
+                ))}
+              </select>
             </div>
           </div>
 
           {/* Chart Area */}
-          <div className="h-[200px] w-full relative">
+          <div className="h-[220px] w-full px-2">
             {loading ? (
               <div className="w-full h-full flex items-center justify-center">
-                 <div className="skeleton w-full h-[180px] rounded-lg" />
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-[#2B5BA8] border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[11px] text-[#94A3B8]">Loading chart data...</span>
+                </div>
               </div>
             ) : error ? (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
+              <div className="w-full h-full flex flex-col items-center justify-center">
                 <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
                 <button 
                   onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
-                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
+                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded-md hover:bg-[#E2E8F0] transition-colors"
                 >
                   Retry
                 </button>
               </div>
             ) : chartData.length === 0 ? (
-              <div className="w-full h-full flex items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
+              <div className="w-full h-full flex items-center justify-center">
                 <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
               </div>
             ) : (
@@ -413,17 +460,19 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
             )}
           </div>
         </div>
-      </div>
-      
-      {/* Interpretation Text */}
-      <div className="text-[13px] text-[#475569] bg-white border border-[#E2E8F0] rounded-md p-3">
-        {interpretationText}
-      </div>
 
+        {/* Interpretation */}
+        <div className="mt-3 flex items-start gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg">
+          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <p className="text-[12px] text-[#475569] leading-relaxed">{interpretationText}</p>
+        </div>
+      </div>
     </div>
   );
 };
 
+
+/* ─────────────────── Uptime Card ─────────────────── */
 
 interface UptimeCardProps {
   stat: UptimeStat;
@@ -445,7 +494,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
   setCustomHistoryCache
 }) => {
   const bootDate = new Date(Date.now() - stat.current_uptime_seconds * 1000);
-  const bootDateStr = `${bootDate.getDate()} ${MONTH_NAMES[bootDate.getMonth()].substring(0,3)} ${bootDate.getFullYear()}`;
+  const bootDateStr = `Since ${bootDate.getDate()} ${MONTH_NAMES[bootDate.getMonth()].substring(0,3)} ${bootDate.getFullYear()}`;
 
   const isRecentRestart = stat.last_restart_time 
     ? (Date.now() - new Date(stat.last_restart_time).getTime()) < 24 * 60 * 60 * 1000
@@ -454,9 +503,15 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
   const isOffline = stat.current_uptime_seconds <= 300;
   const statusText = isOffline
     ? 'Offline'
-    : (isRecentRestart ? 'Restarted Recently' : 'Online');
+    : (isRecentRestart ? 'Restarted' : 'Online');
 
-  // Compute Min/Max for the stat pills IF we have default history loaded
+  const statusColor = isOffline || isRecentRestart ? '#EF4444' : '#15803d';
+  const statusBg = isOffline || isRecentRestart ? '#FEF2F2' : '#F0FDF4';
+
+  const uptime = formatUptimeHero(stat.current_uptime_seconds);
+  const uptimePercent = getUptimePercentage(stat.current_uptime_seconds);
+
+  // Pre-fetch 30d history
   const defaultHistoryKey = `${stat.itemid}-preset-30`;
   const history = customHistoryCache[defaultHistoryKey] || [];
   
@@ -470,7 +525,6 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
     if (validMaxs.length > 0) maxUptime = formatUptimeShort(Math.max(...validMaxs));
   }
 
-  // Pre-fetch 30d history to populate min/max in collapsed view
   useEffect(() => {
     if (!customHistoryCache[defaultHistoryKey]) {
       const to = Math.floor(Date.now() / 1000);
@@ -482,70 +536,96 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
   }, [stat.itemid, customHistoryCache, setCustomHistoryCache, defaultHistoryKey]);
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-sm flex flex-col">
-      {/* Header Area (Clickable) */}
-      <div 
-        className="p-6 cursor-pointer hover:bg-[#FAFBFF] transition-colors duration-150 border-l-[4px]"
-        style={{ borderLeftColor: '#2B5BA8' }}
+    <div
+      className={`bg-white rounded-xl overflow-hidden transition-all duration-300 ease-out
+        ${isExpanded ? 'shadow-lg ring-1 ring-[#2B5BA8]/20' : 'shadow-sm hover:shadow-md border border-[#E2E8F0]'}`}
+    >
+      {/* Collapsed Header */}
+      <div
+        className="cursor-pointer select-none transition-colors duration-200 hover:bg-[#FAFCFF] p-5 flex flex-col gap-4"
         onClick={onToggle}
       >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-[18px] font-bold text-[#0F172A]">{stat.host}</h3>
-            <p className="text-[13px] text-[#94A3B8]">System Uptime</p>
-          </div>
-          <div className="flex items-center gap-3">
-             <span className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1 rounded-full ${
-               isOffline || isRecentRestart ? 'bg-[#FEF2F2] text-[#EF4444]' : 'bg-[#F0FDF4] text-[#15803d]'
-             }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  isOffline || isRecentRestart ? 'bg-[#EF4444] animate-pulse' : 'bg-[#15803d]'
-                }`} />
+        {/* Top Row: Server Name & Status badge + Chevron */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#F1F5F9] text-[#64748B] flex-shrink-0">
+              <Server className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex items-center gap-2.5">
+              <h3 className="text-[16px] font-bold text-[#0F172A] truncate">{stat.host}</h3>
+              <span
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: statusBg, color: statusColor }}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isOffline || isRecentRestart ? 'animate-pulse' : ''
+                  }`}
+                  style={{ backgroundColor: statusColor }}
+                />
                 {statusText}
-             </span>
-             <div className="text-[#94A3B8]">
-               {isExpanded ? (
-                 <ChevronUp className="w-5 h-5 transition-transform duration-200" />
-               ) : (
-                 <ChevronDown className="w-5 h-5 transition-transform duration-200" />
-               )}
-             </div>
+              </span>
+            </div>
+          </div>
+          
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F1F5F9] hover:bg-[#E2E8F0] transition-colors flex-shrink-0"
+          >
+            <ChevronDown
+              className={`w-4 h-4 text-[#64748B] transition-transform duration-300 ${
+                isExpanded ? 'rotate-180' : ''
+              }`}
+            />
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div>
-            <div className="text-[32px] font-bold leading-none tracking-tight text-[#0F172A] mb-1">
-              {formatUptimeFull(stat.current_uptime_seconds)}
-            </div>
-            <div className="text-[13px] text-[#94A3B8]">
-              Since {bootDateStr}
+        {/* Middle Row: Ring + Hero Uptime */}
+        <div className="flex items-center gap-4">
+          {/* Uptime Ring */}
+          <div className="relative flex-shrink-0">
+            <UptimeRing percentage={uptimePercent} color={statusColor === '#15803d' ? '#2B5BA8' : '#EF4444'} size={56} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-[#64748B]">{Math.round(uptimePercent)}%</span>
             </div>
           </div>
 
-          {/* Stat Pills */}
-          <div className="flex flex-wrap gap-2 mt-1">
-            <div className="flex flex-col px-3 py-1.5 bg-[#F8FAFC] rounded-md border border-[#E2E8F0]">
-              <span className="text-[10px] text-[#94A3B8] uppercase font-semibold">Current</span>
-              <span className="text-[13px] text-[#0F172A] font-medium">{formatUptimeShort(stat.current_uptime_seconds)}</span>
+          {/* Uptime Hero Number */}
+          <div>
+            <div className="flex items-baseline gap-0.5 mb-0.5">
+              <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
+                {uptime.days}
+              </span>
+              <span className="text-[11px] font-bold text-[#94A3B8] mr-2">d</span>
+              <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
+                {uptime.hours}
+              </span>
+              <span className="text-[11px] font-bold text-[#94A3B8] mr-2">h</span>
+              <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
+                {uptime.minutes}
+              </span>
+              <span className="text-[11px] font-bold text-[#94A3B8]">m</span>
             </div>
-            <div className="flex flex-col px-3 py-1.5 bg-[#F8FAFC] rounded-md border border-[#E2E8F0]">
-              <span className="text-[10px] text-[#94A3B8] uppercase font-semibold">Min</span>
-              <span className="text-[13px] text-[#0F172A] font-medium">{minUptime}</span>
-            </div>
-            <div className="flex flex-col px-3 py-1.5 bg-[#F8FAFC] rounded-md border border-[#E2E8F0]">
-              <span className="text-[10px] text-[#94A3B8] uppercase font-semibold">Max</span>
-              <span className="text-[13px] text-[#0F172A] font-medium">{maxUptime}</span>
-            </div>
-            <div className="flex flex-col px-3 py-1.5 bg-[#F8FAFC] rounded-md border border-[#E2E8F0]">
-              <span className="text-[10px] text-[#94A3B8] uppercase font-semibold">Restarts</span>
-              <span className={`text-[13px] font-medium ${stat.restart_count > 0 ? 'text-[#EF4444]' : 'text-[#3DBE7A]'}`}>{stat.restart_count}</span>
-            </div>
-            <div className="flex flex-col px-3 py-1.5 bg-[#F8FAFC] rounded-md border border-[#E2E8F0]">
-              <span className="text-[10px] text-[#94A3B8] uppercase font-semibold">Last Restart</span>
-              <span className={`text-[13px] font-medium ${!stat.last_restart_time ? 'text-[#3DBE7A]' : 'text-[#0F172A]'}`}>{formatLastRestart(stat.last_restart_time)}</span>
-            </div>
+            <p className="text-[11px] text-[#94A3B8]">{bootDateStr}</p>
           </div>
+        </div>
+
+        {/* Bottom Row: Mini Stat Pills (full card width grid) */}
+        <div className="grid grid-cols-3 gap-2.5 pt-3.5 border-t border-[#F1F5F9]">
+          {[
+            { label: 'MIN UPTIME', value: minUptime },
+            { label: 'MAX UPTIME', value: maxUptime },
+            { label: 'RESTARTS', value: String(stat.restart_count), danger: stat.restart_count > 0 },
+          ].map((pill, i) => (
+            <div
+              key={i}
+              className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]"
+            >
+              <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">{pill.label}</span>
+              <span className={`text-[12px] font-extrabold ${pill.danger ? 'text-[#EF4444]' : 'text-[#0F172A]'} truncate w-full text-center`}>
+                {pill.value}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -564,6 +644,8 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
 };
 
 
+/* ─────────────────── Section ─────────────────── */
+
 interface UptimeSectionProps {
   data: UptimeStat[];
 }
@@ -571,7 +653,6 @@ interface UptimeSectionProps {
 const UptimeSection: React.FC<UptimeSectionProps> = ({ data }) => {
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
 
-  // Lifted caches for periods and custom history to persist across toggles
   const [availablePeriodsCache, setAvailablePeriodsCache] = useState<Record<number, AvailablePeriod[]>>({});
   const [customHistoryCache, setCustomHistoryCache] = useState<Record<string, UptimeHistoryPoint[]>>({});
 
@@ -581,15 +662,22 @@ const UptimeSection: React.FC<UptimeSectionProps> = ({ data }) => {
 
   return (
     <div className="w-full">
-      <h3 className="text-[16px] font-semibold text-[#0F172A] mb-4">Server Uptime</h3>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 transition-all duration-300">
+      <div className="flex items-center gap-2 mb-5">
+        <div className="w-1 h-5 rounded-full bg-[#2B5BA8]" />
+        <h3 className="text-[15px] font-semibold text-[#0F172A]">Server Uptime</h3>
+        <span className="text-[11px] text-[#94A3B8] font-medium ml-1">
+          {data.length} {data.length === 1 ? 'server' : 'servers'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 transition-all duration-300">
         {data.map(stat => {
           const isExpanded = expandedItemId === stat.itemid;
           return (
             <div
               key={stat.itemid}
-              className={`transition-all duration-300 ${
-                isExpanded ? 'xl:col-span-2' : 'xl:col-span-1'
+              className={`transition-all duration-300 ease-out ${
+                isExpanded ? 'lg:col-span-2' : 'lg:col-span-1'
               }`}
             >
               <UptimeCard 

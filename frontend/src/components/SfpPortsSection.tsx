@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Activity, Link2, ShieldAlert, Check } from 'lucide-react';
 import {
   getSfpPortHistory,
   getSfpAvailablePeriods,
@@ -525,90 +525,163 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
   };
 
   const pill = getStatusPill();
+  const isStable = lastValue === 1 && downCount === 0;
+  const isDown = lastValue === 2;
 
-  // Conclusion text
+  // Border & Glow Accent Colors based on status
+  const accentColor = isStable ? '#10B981' : (isDown ? '#EF4444' : '#F59E0B');
+
+  // Conclusion text (without emojis, since we render React icons)
   const conclusionText =
     lastValue === 1 && downCount === 0
-      ? '✅ Liaison stable — aucune coupure détectée sur la période.'
+      ? 'Liaison stable — aucune coupure détectée sur la période.'
       : downCount > 0
-      ? `⚠️ ${downCount} interruption(s) détectée(s) — dernière: ${formatLastDown(stat.last_down)}`
+      ? `${downCount} interruption(s) détectée(s) — dernière: ${formatLastDown(stat.last_down)}`
       : '';
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-[12px] overflow-hidden shadow-sm flex flex-col">
-      {/* Header (clickable) */}
+    <div
+      className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 ease-out flex flex-col
+        ${isExpanded ? 'shadow-lg ring-1 ring-[#6B8FD4]/20' : 'shadow-sm hover:shadow-md border-[#E2E8F0]'}`}
+    >
+      {/* Card Header (clickable) */}
       <div
-        className="p-5 cursor-pointer hover:bg-[#FAFBFF] transition-colors duration-150 border-l-[4px]"
-        style={{ borderLeftColor: '#6B8FD4' }}
+        className="p-5 cursor-pointer select-none transition-colors duration-200 hover:bg-[#FAFCFF] flex flex-col gap-4"
         onClick={onToggle}
       >
-        {/* Top row: name + status pill + chevron */}
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-[18px] font-bold text-[#0F172A]">SFP Port {portNum}</h3>
-            <p className="text-[13px] text-[#94A3B8]">SW-1 Fibre Uplink</p>
+        {/* Top Row: Name + Status Pill + Chevron */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div 
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300"
+              style={{
+                backgroundColor: isStable ? '#ECFDF5' : (isDown ? '#FEF2F2' : '#FFFBEB'),
+                color: accentColor
+              }}
+            >
+              <Link2 className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h3 className="text-[16px] font-bold text-[#0F172A]">SFP Port {portNum}</h3>
+              <p className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">SW-1 Fibre Uplink</p>
+            </div>
           </div>
+
           <div className="flex items-center gap-3">
             <span
-              className="inline-flex items-center text-[12px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: pill.bg, color: pill.color }}
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
+              style={{
+                backgroundColor: isStable ? '#E6FDF0' : (isDown ? '#FEECEE' : '#FFF3D6'),
+                color: accentColor,
+              }}
             >
-              {pill.label}
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${!isStable ? 'animate-pulse' : ''}`}
+                style={{ backgroundColor: accentColor }}
+              />
+              {pill.label.replace(/^[^\s]+\s+/, '')}
             </span>
-            <div className="text-[#94A3B8]">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F1F5F9] hover:bg-[#E2E8F0] transition-colors flex-shrink-0">
               {isExpanded ? (
-                <ChevronUp className="w-5 h-5 transition-transform duration-200" />
+                <ChevronUp className="w-4 h-4 text-[#64748B]" />
               ) : (
-                <ChevronDown className="w-5 h-5 transition-transform duration-200" />
+                <ChevronDown className="w-4 h-4 text-[#64748B]" />
               )}
             </div>
           </div>
         </div>
 
-        {/* Stats row — 5 boxes */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {/* Last */}
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[64px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Last</span>
-            <span className="text-[13px] font-bold" style={{ color: valueColor(lastValue) }}>
+        {/* Optical Link Panel */}
+        <div 
+          className="rounded-xl p-4 flex items-center justify-between overflow-hidden relative border border-[#E2E8F0] bg-[#F8FAFC] gap-3"
+        >
+          {/* Background pattern lines (simulating optical link) */}
+          <div className="absolute inset-0 opacity-40 pointer-events-none">
+            <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id={`grid-${portNum}`} width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#E2E8F0" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill={`url(#grid-${portNum})`} />
+            </svg>
+          </div>
+
+          <div className="flex items-center gap-3 relative z-10 min-w-0">
+            <div 
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{
+                backgroundColor: `${accentColor}15`,
+                border: `1px solid ${accentColor}30`,
+                color: accentColor
+              }}
+            >
+              <Activity className="w-4.5 h-4.5 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Fibre Optic Link</div>
+              <div className="text-[14px] font-extrabold text-[#0F172A] mt-0.5 truncate">
+                {avgValue !== null ? `${(avgValue * 100).toFixed(2)}%` : '—'} Average Uptime
+              </div>
+            </div>
+          </div>
+
+          {/* Micro laser wave label - in flex flow */}
+          <div className="flex-shrink-0 z-10 flex items-center gap-1 text-[10px] text-[#94A3B8] font-mono font-bold">
+            <span>TX/RX: OK</span>
+          </div>
+        </div>
+
+        {/* Stats Row — 3 columns grid */}
+        <div className="grid grid-cols-3 gap-2">
+          {/* Current State */}
+          <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
+            <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">LINK STATE</span>
+            <span 
+              className="text-[12px] font-extrabold truncate w-full text-center"
+              style={{ color: valueColor(lastValue) }}
+            >
               {valueLabel(lastValue)}
             </span>
           </div>
-          {/* Min */}
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[64px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Min</span>
-            <span className="text-[13px] font-bold" style={{ color: valueColor(minValue) }}>
-              {valueLabel(minValue)}
-            </span>
-          </div>
-          {/* Avg */}
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[64px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Avg</span>
-            <span className="text-[13px] font-bold" style={{ color: avgColor(avgValue) }}>
-              {avgValue !== null ? Number(avgValue).toFixed(4) : '—'}
-            </span>
-          </div>
-          {/* Max */}
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[64px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Max</span>
-            <span className="text-[13px] font-bold" style={{ color: '#3DBE7A' }}>
-              {valueLabel(maxValue)}
-            </span>
-          </div>
+
           {/* Flaps */}
-          <div className="flex flex-col px-3 py-2 bg-[#F8FAFC] rounded-md border border-[#E2E8F0] min-w-[64px]">
-            <span className="text-[10px] text-[#94A3B8] uppercase font-semibold mb-0.5">Flaps</span>
-            <span className="text-[13px] font-bold" style={{ color: flapsColor(downCount) }}>
+          <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
+            <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">LINK FLAPS</span>
+            <span 
+              className="text-[12px] font-extrabold truncate w-full text-center"
+              style={{ color: downCount > 0 ? '#EF4444' : '#3DBE7A' }}
+            >
               {downCount}
+            </span>
+          </div>
+
+          {/* Min/Max Status */}
+          <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
+            <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">MIN / MAX</span>
+            <span className="text-[11px] font-extrabold text-[#0F172A] truncate w-full text-center">
+              {valueLabel(minValue)} / {valueLabel(maxValue)}
             </span>
           </div>
         </div>
 
-        {/* Conclusion text */}
+        {/* Conclusion Panel */}
         {conclusionText && (
-          <p className="text-[13px] italic" style={{ color: '#475569' }}>
-            {conclusionText}
-          </p>
+          <div 
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-[11.5px]"
+            style={{
+              backgroundColor: isStable ? '#F0FDF4' : '#FFFBEB',
+              borderColor: isStable ? '#DCFCE7' : '#FEF3C7',
+              color: isStable ? '#166534' : '#92400E'
+            }}
+          >
+            {isStable ? (
+              <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            ) : (
+              <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />
+            )}
+            <p className="leading-tight font-semibold">{conclusionText}</p>
+          </div>
         )}
       </div>
 

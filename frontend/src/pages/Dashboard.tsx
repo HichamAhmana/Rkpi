@@ -161,9 +161,9 @@ const Dashboard: React.FC = () => {
 
   // ─── Dashboard content ────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total Hosts"
           value={hostStats.total}
@@ -192,17 +192,20 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Server Uptime */}
-      <UptimeSection data={uptimeData} />
+      {/* Server Health (Uptime + Agent Availability grouped together) */}
+      <div className="space-y-6">
+        {/* Server Uptime */}
+        <UptimeSection data={uptimeData} />
+
+        {/* Agent Availability — placed right under uptime for server grouping */}
+        <AgentAvailabilitySection data={agentData} />
+      </div>
 
       {/* SW-1 SFP Uplink Ports */}
       <SfpPortsSection data={sfpData} />
 
       {/* Network Switches — Uptime & Availability */}
       <SwitchUptimeSection data={switchData} />
-
-      {/* Agent Availability */}
-      <AgentAvailabilitySection data={agentData} />
 
       {/* Service Availability */}
       <ServiceAvailabilityTable data={serviceData} />

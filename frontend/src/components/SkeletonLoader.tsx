@@ -18,12 +18,17 @@ export const SkeletonBlock: React.FC<SkeletonProps & { width?: string; height?: 
 /** KPI card skeleton */
 export const SkeletonKPICard: React.FC = () => (
   <div
-    className="bg-white rounded-xl border border-[#E2E8F0] p-5"
-    style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' }}
+    className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden"
+    style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.03)' }}
   >
-    <div className="skeleton w-10 h-10 rounded-full mb-4" />
-    <div className="skeleton w-20 h-3 mb-2" />
-    <div className="skeleton w-16 h-8" />
+    <div className="skeleton h-[3px] w-full" />
+    <div className="px-4 py-3 flex items-center gap-3">
+      <div className="skeleton w-9 h-9 rounded-lg flex-shrink-0" />
+      <div className="flex-1">
+        <div className="skeleton w-16 h-2.5 mb-1.5" />
+        <div className="skeleton w-10 h-5" />
+      </div>
+    </div>
   </div>
 );
 
@@ -91,7 +96,7 @@ export const SkeletonAgentCard: React.FC = () => (
 export const DashboardSkeleton: React.FC = () => (
   <div className="space-y-6">
     {/* KPI row */}
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <SkeletonKPICard key={i} />
       ))}
