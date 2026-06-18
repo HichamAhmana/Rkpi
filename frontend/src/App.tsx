@@ -7,7 +7,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="flex h-screen bg-page overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
@@ -17,7 +17,7 @@ function App() {
           pageTitle="Dashboard"
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
-        <main className="flex-1 overflow-y-auto p-6 bg-[#F8FAFC]">
+        <main className="flex-1 overflow-y-auto p-6 bg-page">
           <Dashboard />
         </main>
       </div>

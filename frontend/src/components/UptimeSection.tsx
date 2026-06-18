@@ -147,9 +147,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - activePreset * 24 * 3600;
-      return { key: `${itemid}-preset-${activePreset}`, from, to };
+      return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -525,11 +523,9 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
     if (validMaxs.length > 0) maxUptime = formatUptimeShort(Math.max(...validMaxs));
   }
 
-  useEffect(() => {
+ useEffect(() => {
     if (!customHistoryCache[defaultHistoryKey]) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - 30 * 24 * 3600;
-      getUptimeHistory(stat.itemid, from, to).then(data => {
+      getUptimeHistory(stat.itemid).then(data => {
         setCustomHistoryCache(prev => ({ ...prev, [defaultHistoryKey]: data }));
       }).catch(err => console.error("Failed to load pre-fetch uptime history", err));
     }

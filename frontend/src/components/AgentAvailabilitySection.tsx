@@ -124,9 +124,7 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - activePreset * 24 * 3600;
-      return { key: `${itemid}-preset-${activePreset}`, from, to };
+      return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -140,11 +138,12 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
     
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
-      setError(false);
+     
       return;
     }
 
     let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
 

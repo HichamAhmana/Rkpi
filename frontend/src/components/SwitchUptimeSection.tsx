@@ -107,9 +107,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - activePreset * 24 * 3600;
-      return { key: `sw-${itemid}-preset-${activePreset}`, from, to };
+      return { key: `sw-${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;

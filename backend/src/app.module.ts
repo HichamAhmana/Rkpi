@@ -16,7 +16,6 @@ import { ZabbixModule } from './zabbix/zabbix.module';
       database: process.env.DB_ZABBIX_NAME ?? 'zabbix',
       synchronize: false,
       autoLoadEntities: true,
-      c,
     }),
     ZabbixModule,
   ],

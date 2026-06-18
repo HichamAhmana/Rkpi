@@ -98,9 +98,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - activePreset * 24 * 3600;
-      return { key: `sfp-${itemid}-preset-${activePreset}`, from, to };
+      return { key: `sfp-${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -114,10 +112,8 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
     if (!currentSelectionParams) return;
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
-      setError(false);
       return;
     }
-
     let isMounted = true;
     setLoading(true);
     setError(false);
@@ -252,7 +248,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
       points: pointAnnotations,
     },
     tooltip: {
-      custom: function ({ seriesIndex, dataPointIndex, w }: any) {
+      custom: function ({ seriesIndex, dataPointIndex, w }: { seriesIndex: number; dataPointIndex: number; w: { globals: { initialSeries: { data: { x: number; y: number; avg_value: number }[] }[] } } }) {
         const d = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
         const date = new Date(d.x);
         const dayStr = `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
@@ -290,13 +286,11 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
   const currentStatusLabel = lastValue === 1 ? 'Up' : lastValue === 2 ? 'Down' : '—';
   const currentStatusDot = lastValue === 1 ? '#3DBE7A' : '#EF4444';
 
-  let interpretationBullet1 = `• Port SFP ${portNum} ${currentStatusLabel} (${lastValue}) avec last/min/avg/max = ${lastValue ?? '—'} / ${minValue ?? '—'} / ${avgValue !== null ? Number(avgValue).toFixed(4) : '—'} / ${maxValue ?? '—'}.`;
-  let interpretationBullet2 = '';
-  if (downCount === 0) {
-    interpretationBullet2 = '• Conclusion : liaison stable sur la période.';
-  } else {
-    interpretationBullet2 = `• Conclusion : ${downCount} flap(s) détecté(s) — vérifier la fibre.`;
-  }
+  const interpretationBullet1 = `• Port SFP ${portNum} ${currentStatusLabel} (${lastValue}) avec last/min/avg/max = ${lastValue ?? '—'} / ${minValue ?? '—'} / ${avgValue !== null ? Number(avgValue).toFixed(4) : '—'} / ${maxValue ?? '—'}.`;
+  const interpretationBullet2 =
+    downCount === 0
+      ? '• Conclusion : liaison stable sur la période.'
+      : `• Conclusion : ${downCount} flap(s) détecté(s) — vérifier la fibre.`;
 
   return (
     <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-5 px-6 flex flex-col gap-6 overflow-hidden transition-all duration-300">

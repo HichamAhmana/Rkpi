@@ -65,8 +65,6 @@ const ServiceSparkline: React.FC<{ history: HistoryPoint[]; isRunning: boolean }
     fill: { type: 'solid', opacity: 0.2 },
     xaxis: { 
       type: 'datetime',
-      min: Date.now() - 30 * 24 * 3600 * 1000,
-      max: Date.now()
     },
     tooltip: { enabled: false },
   };
@@ -129,12 +127,10 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   const years = Array.from(new Set(periods.map(p => p.year))).sort((a, b) => b - a);
   const monthsForSelectedYear = periods.filter(p => p.year === selectedYear).map(p => p.month).sort((a, b) => b - a);
 
-  // Determine the cache key and time range for the current selection
-  const currentSelectionParams = useMemo(() => {
+ const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - activePreset * 24 * 3600;
-      return { key: `${itemid}-preset-${activePreset}`, from, to };
+      // Don't send from/to — let backend use MAX(clock) as default
+      return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -142,7 +138,6 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     }
     return null;
   }, [itemid, activePreset, selectedYear, selectedMonth]);
-
   // Fetch data if needed
   useEffect(() => {
     if (!currentSelectionParams) return;
@@ -154,11 +149,12 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
 
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
-      setError(false);
+      
       return; // Already cached
     }
 
     let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
 

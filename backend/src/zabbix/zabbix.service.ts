@@ -113,7 +113,7 @@ export class ZabbixService {
       WHERE e.source = 0
         AND h.templateid IS NULL
         AND h.flags = 0
-        AND e.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        AND e.clock >= (SELECT MAX(clock) FROM events WHERE source = 0) - (30 * 24 * 3600)
       GROUP BY DATE(FROM_UNIXTIME(e.clock))
       ORDER BY day ASC
     `);
@@ -211,14 +211,14 @@ export class ZabbixService {
          FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value != 0
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as incident_days,
         -- Last incident time
         (SELECT FROM_UNIXTIME(MAX(hu.clock))
          FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value != 0
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as last_incident
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
@@ -249,7 +249,7 @@ export class ZabbixService {
           (SELECT AVG(CASE WHEN hu.value = 1 THEN 1 ELSE 0 END) * 100
            FROM history_uint hu
            WHERE hu.itemid = i.itemid
-           AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+           AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
           ), 2
         ) as availability_pct
       FROM items i
@@ -276,26 +276,26 @@ export class ZabbixService {
           (SELECT AVG(CASE WHEN hu.value = 1 THEN 1.0 ELSE 0.0 END) * 100
            FROM history_uint hu
            WHERE hu.itemid = i.itemid
-           AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+           AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
           ), 4
         ) as availability_pct,
         -- Total checks
         (SELECT COUNT(*) FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as total_checks,
         -- Unavailable count
         (SELECT COUNT(*) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value != 1
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as unavailable_checks,
         -- Last unavailable time
         (SELECT FROM_UNIXTIME(MAX(hu.clock))
          FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value != 1
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as last_unavailable
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
@@ -309,7 +309,13 @@ export class ZabbixService {
     from?: number,
     to?: number,
   ): Promise<unknown[]> {
-    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const maxClockResult: any[] = await this.zabbixDataSource.query(
+      `SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?`,
+      [itemid],
+    );
+    const toTs =
+      to ??
+      (Number(maxClockResult[0]?.max_clock) || Math.floor(Date.now() / 1000));
     const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
 
     return this.zabbixDataSource.query(
@@ -358,22 +364,22 @@ export class ZabbixService {
         h.name as host,
         i.itemid,
         -- Current uptime in seconds (latest value)
-        (SELECT CAST(hi.value AS UNSIGNED) FROM history hi
-         WHERE hi.itemid = i.itemid
-         ORDER BY hi.clock DESC LIMIT 1) as current_uptime_seconds,
+        (SELECT hu.value FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         ORDER BY hu.clock DESC LIMIT 1) as current_uptime_seconds,
         -- Last restart time = when uptime last dropped below 300 seconds
-        (SELECT FROM_UNIXTIME(hi.clock)
-         FROM history hi
-         WHERE hi.itemid = i.itemid
-         AND hi.value < 300
-         AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
-         ORDER BY hi.clock ASC LIMIT 1) as last_restart_time,
-        -- Number of restarts in 30 days = number of times uptime dropped below 300
-        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hi.clock)))
-         FROM history hi
-         WHERE hi.itemid = i.itemid
-         AND hi.value < 300
-         AND hi.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+        (SELECT FROM_UNIXTIME(hu.clock)
+         FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value < 300
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
+         ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
+        -- Number of restarts in 30 days
+        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hu.clock)))
+         FROM history_uint hu
+         WHERE hu.itemid = i.itemid
+         AND hu.value < 300
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
         ) as restart_count
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
@@ -387,17 +393,23 @@ export class ZabbixService {
     from?: number,
     to?: number,
   ): Promise<unknown[]> {
-    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const maxClockResult: any[] = await this.zabbixDataSource.query(
+      `SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?`,
+      [itemid],
+    );
+    const toTs =
+      to ??
+      (Number(maxClockResult[0]?.max_clock) || Math.floor(Date.now() / 1000));
     const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
 
     return this.zabbixDataSource.query(
       `
       SELECT
         DATE(FROM_UNIXTIME(clock)) as day,
-        MAX(CAST(value AS UNSIGNED)) as max_uptime_seconds,
-        MIN(CAST(value AS UNSIGNED)) as min_uptime_seconds,
-        CASE WHEN MIN(CAST(value AS UNSIGNED)) < 300 THEN 1 ELSE 0 END as had_restart
-      FROM history
+        MAX(value) as max_uptime_seconds,
+        MIN(value) as min_uptime_seconds,
+        CASE WHEN MIN(value) < 300 THEN 1 ELSE 0 END as had_restart
+      FROM history_uint
       WHERE itemid = ?
         AND clock >= ?
         AND clock <= ?
@@ -407,7 +419,6 @@ export class ZabbixService {
       [itemid, fromTs, toTs],
     );
   }
-
   async getUptimeAvailablePeriods(
     itemid: string,
   ): Promise<{ year: number; month: number }[]> {
@@ -417,7 +428,7 @@ export class ZabbixService {
       SELECT
         YEAR(FROM_UNIXTIME(clock)) as year,
         MONTH(FROM_UNIXTIME(clock)) as month
-      FROM history
+      FROM history_uint
       WHERE itemid = ?
       GROUP BY year, month
       ORDER BY year DESC, month DESC
@@ -448,7 +459,15 @@ export class ZabbixService {
       query += ` AND hu.clock >= ?`;
       params.push(Number(from));
     } else {
-      const defaultFrom = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+      const maxClockResult: any[] = await this.zabbixDataSource.query(
+        `
+      SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?
+    `,
+        [itemid],
+      );
+      const maxClock =
+        Number(maxClockResult[0]?.max_clock) || Math.floor(Date.now() / 1000);
+      const defaultFrom = maxClock - 30 * 24 * 60 * 60;
       query += ` AND hu.clock >= ?`;
       params.push(defaultFrom);
     }
@@ -505,37 +524,42 @@ export class ZabbixService {
         -- Min over 30 days
         (SELECT MIN(hu.value) FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as min_value,
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as min_value,
         -- Avg over 30 days
         (SELECT ROUND(AVG(hu.value), 4) FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as avg_value,
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as avg_value,
         -- Max over 30 days
         (SELECT MAX(hu.value) FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as max_value,
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as max_value,
         -- How many times it went down
         (SELECT COUNT(*) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value = 2
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as down_count,
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as down_count,
         -- Last time it went down
         (SELECT FROM_UNIXTIME(MAX(hu.clock)) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value = 2
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as last_down
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as last_down
       FROM items i
       WHERE i.itemid IN (64499, 64501, 64502)
       ORDER BY port_number ASC
     `);
   }
-
   async getSfpPortHistory(
     itemid: string,
     from?: number,
     to?: number,
   ): Promise<unknown[]> {
-    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const maxClockResult: any[] = await this.zabbixDataSource.query(
+      `SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?`,
+      [itemid],
+    );
+    const toTs =
+      to ??
+      (Number(maxClockResult[0]?.max_clock) || Math.floor(Date.now() / 1000));
     const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
 
     return this.zabbixDataSource.query(
@@ -590,30 +614,24 @@ export class ZabbixService {
         h.name as switch_name,
         h.hostid,
         i.itemid,
-        -- Current uptime in seconds
         (SELECT hu.value FROM history_uint hu
          WHERE hu.itemid = i.itemid
          ORDER BY hu.clock DESC LIMIT 1) as current_uptime_seconds,
-        -- Last check time
         (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          ORDER BY hu.clock DESC LIMIT 1) as last_check,
-        -- Min uptime in period
         (SELECT MIN(hu.value) FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as min_uptime_seconds,
-        -- Restart count (uptime < 300 seconds = just rebooted)
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as min_uptime_seconds,
         (SELECT COUNT(*) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value < 300
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))) as restart_count,
-        -- Last restart time
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as restart_count,
         (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
          WHERE hu.itemid = i.itemid
          AND hu.value < 300
-         AND hu.clock >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY))
+         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
          ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
-        -- Port stats
         (SELECT COUNT(DISTINCT i2.itemid) FROM items i2
          WHERE i2.hostid = h.hostid AND i2.key_ LIKE 'ifOperStatus.%') as total_ports,
         (SELECT SUM(CASE WHEN hu2.value = 1 THEN 1 ELSE 0 END)
@@ -642,7 +660,13 @@ export class ZabbixService {
     from?: number,
     to?: number,
   ): Promise<unknown[]> {
-    const toTs = to ?? Math.floor(Date.now() / 1000);
+    const maxClockResult: any[] = await this.zabbixDataSource.query(
+      `SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?`,
+      [itemid],
+    );
+    const toTs =
+      to ??
+      (Number(maxClockResult[0]?.max_clock) || Math.floor(Date.now() / 1000));
     const fromTs = from ?? toTs - 30 * 24 * 60 * 60;
 
     return this.zabbixDataSource.query(
