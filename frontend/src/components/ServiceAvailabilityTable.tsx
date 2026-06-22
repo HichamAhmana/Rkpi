@@ -112,7 +112,7 @@ const ServiceSparkline: React.FC<{ history: HistoryPoint[]; isRunning: boolean }
     },
   ];
 
-  return <Chart options={chartOptions} series={series} type="area" width="100%" height="100%" />;
+  return <Chart options={chartOptions} series={series} type="area" width={140} height={36} />;
 };
 
 // --- Expanded Panel Component ---
@@ -689,7 +689,7 @@ const ServerSection: React.FC<ServerSectionProps> = ({
                           {loadingMap[svc.itemid] ? (
                             <div className="skeleton w-[140px] h-[36px] bg-slate-100 animate-pulse" />
                           ) : (
-                            <div className="w-[140px] h-[36px] flex items-center">
+                            <div className="w-[140px] h-[36px] flex items-center overflow-hidden relative">
                               <ServiceSparkline
                                 history={historyMap[svc.itemid] || []}
                                 isRunning={String(svc.current_state) === '0'}

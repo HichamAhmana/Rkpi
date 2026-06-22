@@ -632,13 +632,17 @@ export class ZabbixService {
          AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
          ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
         (SELECT COUNT(DISTINCT i2.itemid) FROM items i2
-         WHERE i2.hostid = h.hostid AND i2.key_ LIKE 'ifOperStatus.%') as total_ports,
+         WHERE i2.hostid = h.hostid
+         AND i2.key_ LIKE 'ifOperStatus.%'
+         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
+        ) as total_ports,
         (SELECT SUM(CASE WHEN hu2.value = 1 THEN 1 ELSE 0 END)
          FROM items i2
          JOIN history_uint hu2 ON hu2.itemid = i2.itemid
          WHERE i2.hostid = h.hostid
          AND i2.key_ LIKE 'ifOperStatus.%'
          AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
+         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
         ) as up_ports,
         (SELECT SUM(CASE WHEN hu2.value = 2 THEN 1 ELSE 0 END)
          FROM items i2
@@ -646,6 +650,7 @@ export class ZabbixService {
          WHERE i2.hostid = h.hostid
          AND i2.key_ LIKE 'ifOperStatus.%'
          AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
+         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
         ) as down_ports
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
