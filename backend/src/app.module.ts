@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ZabbixModule } from './zabbix/zabbix.module';
+import { GlpiModule } from './modules/glpi/glpi.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ZabbixModule } from './zabbix/zabbix.module';
       autoLoadEntities: true,
     }),
     ZabbixModule,
+    GlpiModule,
   ],
 })
 export class AppModule {}

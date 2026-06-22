@@ -63,42 +63,20 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #E2E8F0 25%, #EEF2F7 50%, #E2E8F0 75%);
+  background: linear-gradient(90deg, var(--color-border) 25%, var(--color-border-light) 50%, var(--color-border) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: 8px;
 }
 
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
   }
-  100% {
-    background-position: -200% 0;
+  50% {
+    opacity: 0.6;
   }
 }
-
-/* ===== Scrollbar Styling ===== */
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
-}
-
-/* ===== Panel Expand Animation ===== */
 
 @keyframes slideDown {
   from {
@@ -111,4 +89,8 @@ body {
     max-height: 2000px;
     transform: translateY(0);
   }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
 }

@@ -1,7 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  Server, 
+  Clock, 
+  Activity, 
+  Layers, 
+  CheckCircle2, 
+  XCircle, 
+  AlertTriangle 
+} from 'lucide-react';
 import {
   getServiceHistory,
   getServiceAvailablePeriods,
@@ -10,15 +20,16 @@ import {
   type AvailablePeriod,
   type ServiceItem,
 } from '../services/api';
+import { BRAND, STATUS, TEXT, SURFACE } from '../styles/colors';
 
 interface ServiceAvailabilityTableProps {
   data: ServerServices[];
 }
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  running: { bg: '#ECFDF5', text: '#059669', dot: '#059669', label: 'Running' },
-  anomaly: { bg: '#FFFBEB', text: '#D97706', dot: '#D97706', label: 'Anomaly' },
-  stopped: { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626', label: 'Stopped' },
+  running: { bg: 'rgba(16, 185, 129, 0.08)', text: '#059669', dot: '#10B981', label: 'Running' },
+  anomaly: { bg: 'rgba(245, 158, 11, 0.08)', text: '#D97706', dot: '#F59E0B', label: 'Anomaly' },
+  stopped: { bg: 'rgba(239, 68, 68, 0.08)', text: '#DC2626', dot: '#EF4444', label: 'Stopped' },
 };
 
 const formatLastIncident = (dateStr: string | null): string => {
@@ -39,30 +50,52 @@ const getStatusForService = (currentState: string, incidentDays: number) => {
   return 'running';
 };
 
+const parseServiceName = (fullName: string) => {
+  const match = fullName.match(/State of service "([^"]+)" \(([^)]+)\)/);
+  if (match) {
+    return { name: match[1], description: match[2] };
+  }
+  const simpleMatch = fullName.match(/service "([^"]+)"/);
+  if (simpleMatch) {
+    return { name: simpleMatch[1], description: fullName };
+  }
+  return { name: fullName, description: '' };
+};
+
 const StatusBadge: React.FC<{ currentState: string; incidentDays: number }> = ({ currentState, incidentDays }) => {
   const status = getStatusForService(currentState, incidentDays);
   const config = statusConfig[status] || statusConfig.stopped;
+  const isRunning = status === 'running';
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium"
-      style={{ backgroundColor: config.bg, color: config.text }}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium transition-all duration-200"
+      style={{ 
+        backgroundColor: config.bg, 
+        color: config.text,
+        boxShadow: isRunning ? '0 0 8px rgba(16, 185, 129, 0.1)' : 'none'
+      }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.dot }} />
+      <span 
+        className="w-1.5 h-1.5 rounded-full" 
+        style={{ 
+          backgroundColor: config.dot,
+          animation: isRunning ? 'status-pulse 2s infinite' : 'none'
+        }} 
+      />
       {config.label}
     </span>
   );
 };
 
-// --- Sparkline Component (for the table row) ---
-
+// --- Sparkline Component ---
 const ServiceSparkline: React.FC<{ history: HistoryPoint[]; isRunning: boolean }> = ({ history, isRunning }) => {
-  const color = isRunning ? '#3DBE7A' : '#EF4444';
+  const color = isRunning ? BRAND.green : STATUS.danger;
 
   const chartOptions: ApexOptions = {
     chart: { type: 'area', sparkline: { enabled: true }, animations: { enabled: false } },
     colors: [color],
     stroke: { curve: 'smooth', width: 1.5 },
-    fill: { type: 'solid', opacity: 0.2 },
+    fill: { type: 'solid', opacity: 0.15 },
     xaxis: { 
       type: 'datetime',
     },
@@ -83,7 +116,6 @@ const ServiceSparkline: React.FC<{ history: HistoryPoint[]; isRunning: boolean }
 };
 
 // --- Expanded Panel Component ---
-
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -114,7 +146,6 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
 
   const itemid = service.itemid;
 
-  // Load available periods on mount
   useEffect(() => {
     if (!availablePeriodsCache[itemid]) {
       getServiceAvailablePeriods(itemid).then(periods => {
@@ -127,9 +158,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   const years = Array.from(new Set(periods.map(p => p.year))).sort((a, b) => b - a);
   const monthsForSelectedYear = periods.filter(p => p.year === selectedYear).map(p => p.month).sort((a, b) => b - a);
 
- const currentSelectionParams = useMemo(() => {
+  const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      // Don't send from/to — let backend use MAX(clock) as default
       return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
@@ -138,24 +168,23 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     }
     return null;
   }, [itemid, activePreset, selectedYear, selectedMonth]);
-  // Fetch data if needed
+
   useEffect(() => {
     if (!currentSelectionParams) return;
     
-    // If it's the 30 day preset, we already have defaultHistory
     if (activePreset === 30 && defaultHistory.length > 0) {
       return; 
     }
 
     const { key, from, to } = currentSelectionParams;
     if (customHistoryCache[key]) {
-      
-      return; // Already cached
+      return;
     }
 
     let isMounted = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(false);
 
     getServiceHistory(itemid, from, to)
@@ -176,7 +205,6 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     return () => { isMounted = false; };
   }, [currentSelectionParams, customHistoryCache, setCustomHistoryCache, defaultHistory, itemid, activePreset]);
 
-  // Resolve current history to display
   let currentHistory: HistoryPoint[] = [];
   if (activePreset === 30) {
     currentHistory = defaultHistory;
@@ -184,7 +212,6 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     currentHistory = customHistoryCache[currentSelectionParams.key];
   }
 
-  // Group by day MAX
   const chartData = useMemo(() => {
     const grouped: Record<string, number> = {};
     currentHistory.forEach(p => {
@@ -211,7 +238,6 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     const year = parseInt(e.target.value);
     setSelectedYear(year);
     const validMonths = periods.filter(p => p.year === year).map(p => p.month);
-    // If current selected month is not in the new year, pick the most recent one
     if (selectedMonth === null || !validMonths.includes(selectedMonth)) {
       setSelectedMonth(validMonths.length > 0 ? Math.max(...validMonths) : null);
     }
@@ -226,18 +252,17 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   const status = getStatusForService(service.current_state, service.incident_days);
   const badgeConfig = statusConfig[status] || statusConfig.stopped;
 
-  // Chart Configuration
   const annotations = chartData.filter(d => d.value > 0).map(d => ({
     x: new Date(d.time).getTime(),
     marker: {
       size: 5,
-      fillColor: '#EF4444',
-      strokeColor: '#EF4444',
+      fillColor: STATUS.danger,
+      strokeColor: STATUS.danger,
       radius: 2,
     },
     label: {
-      borderColor: '#EF4444',
-      style: { color: '#fff', background: '#EF4444' },
+      borderColor: STATUS.danger,
+      style: { color: '#fff', background: STATUS.danger },
       text: 'Issue',
     }
   }));
@@ -249,20 +274,20 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
       animations: { enabled: false },
       fontFamily: 'Inter, sans-serif',
     },
-    colors: ['#3DBE7A'],
+    colors: [BRAND.green],
     stroke: { curve: 'smooth', width: 2 },
     fill: {
       type: 'gradient',
       gradient: {
         shadeIntensity: 1,
-        opacityFrom: 0.3,
-        opacityTo: 0.0,
+        opacityFrom: 0.25,
+        opacityTo: 0.02,
         stops: [0, 100],
       },
     },
     dataLabels: { enabled: false },
     grid: {
-      borderColor: '#F1F5F9',
+      borderColor: SURFACE.border,
       strokeDashArray: 4,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
@@ -276,7 +301,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0,3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '11px' }
+        style: { colors: TEXT.label, fontSize: '11px' }
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -288,21 +313,17 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
       tickAmount: 1,
       labels: {
         formatter: (val) => val === 0 ? 'Running' : 'Problem',
-        style: { colors: '#94A3B8', fontSize: '11px' }
+        style: { colors: TEXT.label, fontSize: '11px' }
       }
     },
     tooltip: {
-      x: {
-        format: 'dd MMM yyyy'
-      },
+      x: { format: 'dd MMM yyyy' },
       y: {
         formatter: (val) => val === 0 ? 'Running' : 'Issue',
         title: { formatter: () => '' }
       }
     },
-    annotations: {
-      points: annotations
-    }
+    annotations: { points: annotations }
   };
 
   const series = [{
@@ -314,161 +335,435 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   }];
 
   const periodLabel = activePreset ? `Last ${activePreset} days` : (selectedYear && selectedMonth ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range');
+  const parsedName = parseServiceName(service.service_name);
 
   return (
-    <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] p-5 px-6 flex flex-col md:flex-row gap-8 overflow-hidden transition-all duration-300">
-      
-      {/* Left side — Stats summary */}
-      <div className="w-full md:w-[30%] flex flex-col">
-        <h4 className="text-[16px] font-bold text-[#0F172A] mb-4">{service.service_name}</h4>
-        
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Current state</span>
-            <div>
-              <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium"
-                style={{ backgroundColor: badgeConfig.bg, color: badgeConfig.text }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badgeConfig.dot }} />
-                {badgeConfig.label}
-              </span>
-            </div>
-          </div>
+    <div className="bg-[#FAFBFD] border-t border-[var(--color-border)] p-6 flex flex-col lg:flex-row gap-8 transition-all duration-300">
+      <div className="w-full lg:w-[28%] flex flex-col justify-between">
+        <div>
+          <h4 className="text-[15px] font-bold text-slate-800 mb-1">{parsedName.name}</h4>
+          {parsedName.description && (
+            <p className="text-[12px] text-slate-400 mb-4">{parsedName.description}</p>
+          )}
           
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Incidents (30d)</span>
-            <span className={`text-[14px] font-bold ${service.incident_days === 0 ? 'text-[#3DBE7A]' : 'text-[#F59E0B]'}`}>
-              {service.incident_days}
-            </span>
-          </div>
-
-          <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Last incident</span>
-            <span className={`text-[14px] font-bold ${!service.last_incident ? 'text-[#3DBE7A]' : 'text-[#0F172A]'}`}>
-              {formatLastIncident(service.last_incident)}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Monitoring period</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
-              {periodLabel}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Right side — Full chart & Selector */}
-      <div className="w-full md:w-[70%] flex flex-col">
-        
-        {/* Header with Title and Selector */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
-          <div>
-            <h4 className="text-[14px] font-semibold text-[#0F172A] mb-0.5">
-              {service.service_name} — Service State
-            </h4>
-            <p className="text-[12px] text-[#94A3B8]">
-              0 = Running · Any value above 0 = Issue
-            </p>
-          </div>
-
-          {/* Time Range Selector */}
-          <div className="flex flex-col items-end gap-1.5">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Presets */}
-              <div className="flex items-center bg-[#F1F5F9] rounded-lg p-1">
-                {[7, 15, 30].map(days => (
-                  <button
-                    key={days}
-                    onClick={() => handlePresetClick(days)}
-                    className={`px-3 py-1 text-[12px] font-medium rounded-md transition-colors ${
-                      activePreset === days
-                        ? 'bg-[#2B5BA8] text-white shadow-sm'
-                        : 'text-[#64748B] hover:bg-[#E2E8F0]'
-                    }`}
-                  >
-                    {days} days
-                  </button>
-                ))}
-              </div>
-
-              <div className="w-[1px] h-6 bg-[#E2E8F0]" />
-
-              {/* Dropdowns */}
-              <div className="flex items-center gap-2">
-                <select
-                  className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                  value={selectedYear || ''}
-                  onChange={handleYearChange}
+          <div className="grid grid-cols-2 lg:flex lg:flex-col gap-4">
+            <div className="flex flex-col border-b border-slate-100 pb-2.5">
+              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Status</span>
+              <div>
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold"
+                  style={{ backgroundColor: badgeConfig.bg, color: badgeConfig.text }}
                 >
-                  <option value="" disabled>Year</option>
-                  {years.map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
-
-                <select
-                  className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2B5BA8] cursor-pointer"
-                  value={selectedMonth || ''}
-                  onChange={handleMonthChange}
-                  disabled={!selectedYear}
-                >
-                  <option value="" disabled>Month</option>
-                  {monthsForSelectedYear.map(m => (
-                    <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
-                  ))}
-                </select>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badgeConfig.dot }} />
+                  {badgeConfig.label}
+                </span>
               </div>
             </div>
             
-            <span className="text-[11px] font-medium text-[#2B5BA8] bg-[rgba(43,91,168,0.1)] px-2 py-0.5 rounded-full">
-              {activePreset ? `Showing last ${activePreset} days from today` : (selectedYear && selectedMonth ? `Showing: ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range')}
-            </span>
+            <div className="flex flex-col border-b border-slate-100 pb-2.5">
+              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Incidents (30d)</span>
+              <span className={`text-[14px] font-bold ${service.incident_days === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {service.incident_days}
+              </span>
+            </div>
+
+            <div className="flex flex-col border-b border-slate-100 pb-2.5">
+              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Last Incident</span>
+              <span className={`text-[13px] font-bold ${!service.last_incident ? 'text-emerald-500' : 'text-slate-700'}`}>
+                {formatLastIncident(service.last_incident)}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Chart Area */}
-        <div className="h-[200px] w-full relative">
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider block mb-0.5">Monitoring Scope</span>
+          <span className="text-[13px] font-semibold text-slate-700">
+            {periodLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="w-full lg:w-[72%] flex flex-col bg-white border border-slate-100 p-5 rounded-xl shadow-xs">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-5 gap-4">
+          <div>
+            <h4 className="text-[13.5px] font-bold text-slate-805 flex items-center gap-1.5">
+              <Activity className="w-4 h-4 text-slate-400" />
+              Service Status Timeline
+            </h4>
+            <p className="text-[11.5px] text-slate-500 mt-0.5">
+              0 = Running (Operational) · Above 0 = Problem/Outage
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center bg-slate-50 rounded-lg p-1 border border-slate-105">
+              {[7, 15, 30].map(days => (
+                <button
+                  key={days}
+                  onClick={() => handlePresetClick(days)}
+                  className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all duration-205 ${
+                    activePreset === days
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-700'
+                  }`}
+                >
+                  {days}D
+                </button>
+              ))}
+            </div>
+
+            <div className="w-[1px] h-6 bg-slate-200" />
+
+            <div className="flex items-center gap-2">
+              <select
+                className="bg-white border border-slate-200 text-slate-700 text-[11.5px] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer transition-all"
+                value={selectedYear || ''}
+                onChange={handleYearChange}
+              >
+                <option value="" disabled>Year</option>
+                {years.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+
+              <select
+                className="bg-white border border-slate-200 text-slate-700 text-[11.5px] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer transition-all disabled:opacity-50"
+                value={selectedMonth || ''}
+                onChange={handleMonthChange}
+                disabled={!selectedYear}
+              >
+                <option value="" disabled>Month</option>
+                {monthsForSelectedYear.map(m => (
+                  <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[210px] w-full relative">
           {loading ? (
             <div className="w-full h-full flex items-center justify-center">
-               <div className="skeleton w-full h-[180px] rounded-lg" />
+               <div className="skeleton w-full h-[190px] rounded-lg animate-pulse bg-slate-100" />
             </div>
           ) : error ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-              <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-5">
+              <p className="text-slate-400 text-[13px] mb-2 font-medium">Unable to load chart data</p>
               <button 
                 onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
-                className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[12px] font-bold rounded-lg transition-colors"
               >
                 Retry
               </button>
             </div>
           ) : chartData.length === 0 ? (
-            <div className="w-full h-full flex items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-              <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
+            <div className="w-full h-full flex items-center justify-center bg-slate-50 border border-slate-100 rounded-lg">
+              <p className="text-slate-500 text-[12.5px] font-medium">No details available for this selection</p>
             </div>
           ) : (
             <Chart options={chartOptions} series={series} type="area" width="100%" height="100%" />
           )}
         </div>
       </div>
-
     </div>
   );
 };
 
 
-// --- Main Table Component ---
+// --- Collapsible Server Card Component ---
+interface ServerSectionProps {
+  server: ServerServices;
+  isExpanded: boolean;
+  onToggle: () => void;
+  historyMap: Record<number, HistoryPoint[]>;
+  loadingMap: Record<number, boolean>;
+  expandedRowItemId: number | null;
+  onToggleRow: (itemid: number) => void;
+  availablePeriodsCache: Record<number, AvailablePeriod[]>;
+  customHistoryCache: Record<string, HistoryPoint[]>;
+  setAvailablePeriodsCache: React.Dispatch<React.SetStateAction<Record<number, AvailablePeriod[]>>>;
+  setCustomHistoryCache: React.Dispatch<React.SetStateAction<Record<string, HistoryPoint[]>>>;
+}
 
+const ServerSection: React.FC<ServerSectionProps> = ({
+  server,
+  isExpanded,
+  onToggle,
+  historyMap,
+  loadingMap,
+  expandedRowItemId,
+  onToggleRow,
+  availablePeriodsCache,
+  customHistoryCache,
+  setAvailablePeriodsCache,
+  setCustomHistoryCache
+}) => {
+  const stats = useMemo(() => {
+    let running = 0;
+    let anomaly = 0;
+    let stopped = 0;
+    
+    server.services.forEach(svc => {
+      const status = getStatusForService(svc.current_state, svc.incident_days);
+      if (status === 'running') running++;
+      else if (status === 'anomaly') anomaly++;
+      else if (status === 'stopped') stopped++;
+    });
+
+    let overallStatus: 'running' | 'anomaly' | 'stopped' = 'running';
+    if (stopped > 0) overallStatus = 'stopped';
+    else if (anomaly > 0) overallStatus = 'anomaly';
+
+    return { running, anomaly, stopped, total: server.services.length, overallStatus };
+  }, [server.services]);
+
+  const borderLeftColor = {
+    running: 'border-l-[4px] border-l-emerald-500',
+    anomaly: 'border-l-[4px] border-l-amber-500',
+    stopped: 'border-l-[4px] border-l-red-500',
+  }[stats.overallStatus];
+
+  return (
+    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 ${borderLeftColor}`}>
+      {/* Server Header Card */}
+      <div 
+        onClick={onToggle}
+        className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors select-none"
+      >
+        <div className="flex items-center gap-4">
+          <div className={`p-2.5 rounded-lg flex items-center justify-center transition-colors duration-300 ${
+            stats.overallStatus === 'stopped' 
+              ? 'bg-red-50 text-red-500' 
+              : stats.overallStatus === 'anomaly' 
+                ? 'bg-amber-50 text-amber-500' 
+                : 'bg-emerald-50 text-emerald-500'
+          }`}>
+            <Server className="w-5 h-5" />
+          </div>
+
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] font-bold text-slate-800">
+                {server.server_name}
+              </span>
+              <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  stats.overallStatus === 'stopped' 
+                    ? 'bg-red-400' 
+                    : stats.overallStatus === 'anomaly' 
+                      ? 'bg-amber-400' 
+                      : 'bg-emerald-400'
+                }`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  stats.overallStatus === 'stopped' 
+                    ? 'bg-red-500' 
+                    : stats.overallStatus === 'anomaly' 
+                      ? 'bg-amber-500' 
+                      : 'bg-emerald-500'
+                }`} />
+              </span>
+            </div>
+            <span className="text-[11.5px] text-slate-400 font-semibold mt-0.5">
+              {stats.total} {stats.total === 1 ? 'service' : 'services'} monitored
+            </span>
+          </div>
+        </div>
+
+        {/* Center Stats Badges (large screen) */}
+        <div className="hidden sm:flex items-center gap-3">
+          {stats.running > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {stats.running} Active
+            </span>
+          )}
+          {stats.anomaly > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+              <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
+              {stats.anomaly} Anomaly
+            </span>
+          )}
+          {stats.stopped > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-100">
+              <XCircle className="w-3.5 h-3.5" />
+              {stats.stopped} Critical
+            </span>
+          )}
+        </div>
+
+        {/* Right Toggle */}
+        <div className="flex items-center gap-3">
+          {/* Mobile indicator counts */}
+          <div className="sm:hidden flex gap-1.5 items-center">
+            {stats.stopped > 0 && <span className="w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">{stats.stopped}</span>}
+            {stats.anomaly > 0 && <span className="w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-amber-500 rounded-full">{stats.anomaly}</span>}
+          </div>
+          
+          <button className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
+            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Accordion Body */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-white">
+          <div className="w-full overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-150">
+                  <th className="pl-6 pr-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[36%]">Service Name</th>
+                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Current Status</th>
+                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Incidents (30D)</th>
+                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[18%]">Last Incident</th>
+                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">30-Day State Map</th>
+                  <th className="pr-6 pl-2 py-3 w-[4%]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {server.services.map((svc) => {
+                  const isRowExpanded = expandedRowItemId === svc.itemid;
+                  const parsedName = parseServiceName(svc.service_name);
+                  
+                  return (
+                    <React.Fragment key={`${server.server_name}-${svc.itemid}`}>
+                      {/* Service Row */}
+                      <tr
+                        onClick={() => {
+                          onToggleRow(svc.itemid);
+                        }}
+                        className={`border-b border-slate-100 transition-all duration-150 cursor-pointer group ${
+                          isRowExpanded ? 'bg-slate-50/40' : 'hover:bg-slate-50/20'
+                        }`}
+                      >
+                        {/* Service Label Column */}
+                        <td className="pl-6 pr-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="p-1.5 rounded-lg bg-slate-50 text-slate-400 group-hover:text-slate-600 group-hover:bg-slate-100 transition-colors">
+                              <Layers className="w-4 h-4" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[13.5px] font-bold text-slate-700 group-hover:text-slate-900 transition-colors truncate">
+                                {parsedName.name}
+                              </span>
+                              {parsedName.description && (
+                                <span className="text-[11.5px] text-slate-400 truncate mt-0.5">
+                                  {parsedName.description}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Status Column */}
+                        <td className="px-4 py-3.5">
+                          <StatusBadge currentState={svc.current_state} incidentDays={svc.incident_days} />
+                        </td>
+
+                        {/* Incidents 30d Column */}
+                        <td className="px-4 py-3.5">
+                          {svc.incident_days === 0 ? (
+                            <span className="text-[13.5px] font-semibold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md">0</span>
+                          ) : (
+                            <span className="text-[13.5px] font-semibold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md">
+                              {svc.incident_days}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Last Incident Column */}
+                        <td className="px-4 py-3.5 text-[12px] text-slate-500 font-medium font-sans">
+                          {svc.last_incident ? (
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-slate-350" />
+                              <span>{formatLastIncident(svc.last_incident)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 font-normal">None</span>
+                          )}
+                        </td>
+
+                        {/* Sparkline Column */}
+                        <td className="px-4 py-3.5">
+                          {loadingMap[svc.itemid] ? (
+                            <div className="skeleton w-[140px] h-[36px] bg-slate-100 animate-pulse" />
+                          ) : (
+                            <div className="w-[140px] h-[36px] flex items-center">
+                              <ServiceSparkline
+                                history={historyMap[svc.itemid] || []}
+                                isRunning={String(svc.current_state) === '0'}
+                              />
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Row Toggle Trigger Button Column */}
+                        <td className="pr-6 pl-2 py-3.5 text-right">
+                          <div className="flex justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleRow(svc.itemid);
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all duration-200 ${
+                                isRowExpanded 
+                                  ? 'bg-slate-800 border-slate-700 text-white' 
+                                  : 'bg-slate-50 border-slate-150 text-slate-400 hover:text-slate-700 hover:bg-slate-100 hover:border-slate-200'
+                              }`}
+                            >
+                              {isRowExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Expanded Row Content */}
+                      {isRowExpanded && (
+                        <tr className="bg-slate-50/20">
+                          <td colSpan={6} className="p-0 border-b border-slate-200">
+                             <ExpandedServicePanel 
+                               service={svc} 
+                               defaultHistory={historyMap[svc.itemid] || []}
+                               availablePeriodsCache={availablePeriodsCache}
+                               customHistoryCache={customHistoryCache}
+                               setAvailablePeriodsCache={setAvailablePeriodsCache}
+                               setCustomHistoryCache={setCustomHistoryCache}
+                             />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// --- Main Section Component ---
 const ServiceAvailabilityTable: React.FC<ServiceAvailabilityTableProps> = ({ data }) => {
   const [historyMap, setHistoryMap] = useState<Record<number, HistoryPoint[]>>({});
   const [loadingMap, setLoadingMap] = useState<Record<number, boolean>>({});
   const [expandedRowItemId, setExpandedRowItemId] = useState<number | null>(null);
 
+  // Accordion state for expanded servers (default expand first server)
+  const [expandedServers, setExpandedServers] = useState<Record<string, boolean>>(() => {
+    if (data && data.length > 0) {
+      return { [data[0].server_name]: true };
+    }
+    return {};
+  });
+
   // Caches for the expanded panel
   const [availablePeriodsCache, setAvailablePeriodsCache] = useState<Record<number, AvailablePeriod[]>>({});
   const [customHistoryCache, setCustomHistoryCache] = useState<Record<string, HistoryPoint[]>>({});
+
 
   useEffect(() => {
     const fetchHistories = async () => {
@@ -521,122 +816,66 @@ const ServiceAvailabilityTable: React.FC<ServiceAvailabilityTableProps> = ({ dat
     fetchHistories();
   }, [data]);
 
+  const toggleServer = (serverName: string) => {
+    setExpandedServers(prev => ({
+      ...prev,
+      [serverName]: !prev[serverName]
+    }));
+  };
+
   const toggleRow = (itemid: number) => {
     setExpandedRowItemId(prev => prev === itemid ? null : itemid);
   };
 
+  const totalServices = useMemo(() => {
+    if (!data) return 0;
+    return data.reduce((acc, curr) => acc + curr.services.length, 0);
+  }, [data]);
+
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center shadow-sm">
-        <div className="text-[#94A3B8] text-[14px]">No service availability data</div>
+      <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-sm">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+          <Activity className="w-6 h-6" />
+        </div>
+        <p className="text-slate-800 text-[14px] font-bold mb-1">No service availability data</p>
+        <p className="text-slate-400 text-[12px]">Services will appear here when telemetry is received</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-sm">
-      <div className="px-6 py-5 border-b border-[#E2E8F0]">
-        <h3 className="text-[16px] font-semibold text-[#0F172A]">Service Availability</h3>
+    <div className="w-full">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full bg-indigo-500" style={{ backgroundColor: BRAND.darkBlue }} />
+          <h3 className="text-[15px] font-bold text-slate-800">Service Availability</h3>
+          <span className="text-[11px] text-slate-400 font-bold ml-1.5 bg-slate-100 px-2 py-0.5 rounded-full">
+            {totalServices} Monitored
+          </span>
+        </div>
       </div>
 
-      {data.map((server) => (
-        <div key={server.server_name}>
-          <div className="px-6 pt-4 pb-2">
-            <span
-              className="inline-block px-3 py-1 rounded-full text-[13px] font-semibold"
-              style={{ backgroundColor: 'rgba(43, 91, 168, 0.1)', color: '#2B5BA8' }}
-            >
-              {server.server_name}
-            </span>
-          </div>
-
-          <div className="w-full overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#F8FAFC]">
-                  <th className="px-6 py-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Service</th>
-                  <th className="px-6 py-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Incidents (30d)</th>
-                  <th className="px-6 py-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Last Incident</th>
-                  <th className="px-6 py-3 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">30-day History</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {server.services.map((svc) => {
-                  const isExpanded = expandedRowItemId === svc.itemid;
-                  
-                  return (
-                    <React.Fragment key={`${server.server_name}-${svc.itemid}`}>
-                      <tr
-                        onClick={() => toggleRow(svc.itemid)}
-                        className={`border-b border-[#F1F5F9] transition-colors duration-150 cursor-pointer ${
-                          isExpanded ? 'bg-[#FAFBFF]' : 'hover:bg-[#FAFBFF]'
-                        }`}
-                      >
-                        <td className="px-6 py-3.5 text-[14px] font-medium text-[#0F172A]">
-                          {svc.service_name}
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <StatusBadge currentState={svc.current_state} incidentDays={svc.incident_days} />
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <span
-                            className="text-[14px] font-semibold"
-                            style={{ color: svc.incident_days === 0 ? '#3DBE7A' : '#F59E0B' }}
-                          >
-                            {svc.incident_days}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3.5 text-[13px] text-[#94A3B8]">
-                          {formatLastIncident(svc.last_incident)}
-                        </td>
-                        <td className="px-6 py-3.5">
-                          {loadingMap[svc.itemid] ? (
-                            <div className="skeleton w-[180px] h-[50px] bg-[#E2E8F0] animate-pulse" />
-                          ) : (
-                            <div className="w-[180px] h-[50px] flex items-center">
-                              <ServiceSparkline
-                                history={historyMap[svc.itemid] || []}
-                                isRunning={String(svc.current_state) === '0'}
-                              />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5 text-right text-[#94A3B8]">
-                          <div className="flex justify-end items-center pr-2">
-                             {isExpanded ? (
-                               <ChevronUp className="w-5 h-5 transition-transform duration-200" />
-                             ) : (
-                               <ChevronDown className="w-5 h-5 transition-transform duration-200" />
-                             )}
-                          </div>
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded Panel Row */}
-                      {isExpanded && (
-                        <tr className="bg-[#FAFBFF]">
-                          <td colSpan={6} className="p-0 border-b border-[#E2E8F0]">
-                             <ExpandedServicePanel 
-                               service={svc} 
-                               defaultHistory={historyMap[svc.itemid] || []}
-                               availablePeriodsCache={availablePeriodsCache}
-                               customHistoryCache={customHistoryCache}
-                               setAvailablePeriodsCache={setAvailablePeriodsCache}
-                               setCustomHistoryCache={setCustomHistoryCache}
-                             />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
+      {/* List of Collapsible Servers */}
+      <div className="flex flex-col gap-4">
+        {data.map((server) => (
+          <ServerSection
+            key={server.server_name}
+            server={server}
+            isExpanded={!!expandedServers[server.server_name]}
+            onToggle={() => toggleServer(server.server_name)}
+            historyMap={historyMap}
+            loadingMap={loadingMap}
+            expandedRowItemId={expandedRowItemId}
+            onToggleRow={toggleRow}
+            availablePeriodsCache={availablePeriodsCache}
+            customHistoryCache={customHistoryCache}
+            setAvailablePeriodsCache={setAvailablePeriodsCache}
+            setCustomHistoryCache={setCustomHistoryCache}
+          />
+        ))}
+      </div>
     </div>
   );
 };
