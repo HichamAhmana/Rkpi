@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import { LayoutGrid, Monitor, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface NavItem {
+  id: 'zabbix' | 'glpi';
   label: string;
   icon: React.ElementType;
-  active?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { label: 'Zabbix M', icon: LayoutGrid, active: true },
-  { label: 'GLPI M', icon: Monitor },
+  { id: 'zabbix', label: 'Zabbix M', icon: LayoutGrid },
+  { id: 'glpi', label: 'GLPI M', icon: Monitor },
 ];
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
+  activeTab: 'zabbix' | 'glpi';
+  onTabChange: (tab: 'zabbix' | 'glpi') => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, activeTab, onTabChange }) => {
   // Desktop collapse state
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -65,23 +67,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle }) => {
           <ul className="space-y-1 px-3 transition-all duration-200">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const isActive = item.id === activeTab;
               return (
-                <li key={item.label}>
+                <li key={item.id}>
                   <a
                     href="#"
-                    onClick={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onTabChange(item.id);
+                    }}
                     title={isCollapsed ? item.label : undefined}
                     className={`
                       flex items-center rounded-lg text-[14px]
                       transition-all duration-150 relative group
                       ${isCollapsed ? 'lg:justify-center lg:px-0 lg:py-3' : 'gap-3 px-3 py-2.5'}
-                      ${item.active
+                      ${isActive
                         ? 'bg-[#EFF6FF] text-[#2B5BA8] font-semibold'
                         : 'text-[#64748B] hover:bg-[#F0F7FF] hover:text-[#2B5BA8]'
                       }
                     `}
                     style={
-                      item.active 
+                      isActive 
                         ? { borderLeft: '3px solid #2B5BA8' } 
                         : { borderLeft: '3px solid transparent' }
                     }

@@ -1,5 +1,6 @@
 # Large SQL dump files (too large for GitHub)
 zabbix_test.sql
+glpi.sql
 
 # OS files
 .DS_Store

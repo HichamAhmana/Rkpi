@@ -12,6 +12,10 @@ export default defineConfig({
       '/zabbix': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+      },
+      '/glpi': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
       }
     }
   }

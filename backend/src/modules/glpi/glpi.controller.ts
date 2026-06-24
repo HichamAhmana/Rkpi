@@ -11,19 +11,27 @@ export class GlpiController {
   @Get('kpi-summary')
   async getKpiSummary(
     @Query('month') month?: string,
+    @Query('type') type?: string,
   ): Promise<KpiSummaryResponseDto> {
     // If month is not specified, default to '2026-04' to ensure consistent fallback behavior
     const targetMonth = month || '2026-04';
-    return this.glpiService.getKpiSummary(targetMonth);
+    const parsedType = type ? parseInt(type, 10) : undefined;
+    return this.glpiService.getKpiSummary(targetMonth, parsedType);
   }
 
   @Get('ticket-volume')
-  async getTicketVolume(): Promise<TicketVolumeDto[]> {
-    return this.glpiService.getTicketVolume();
+  async getTicketVolume(
+    @Query('type') type?: string,
+  ): Promise<TicketVolumeDto[]> {
+    const parsedType = type ? parseInt(type, 10) : undefined;
+    return this.glpiService.getTicketVolume(parsedType);
   }
 
   @Get('time-trends')
-  async getTimeTrends(): Promise<TimeTrendsDto> {
-    return this.glpiService.getTimeTrends();
+  async getTimeTrends(
+    @Query('type') type?: string,
+  ): Promise<TimeTrendsDto> {
+    const parsedType = type ? parseInt(type, 10) : undefined;
+    return this.glpiService.getTimeTrends(parsedType);
   }
 }

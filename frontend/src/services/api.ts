@@ -4,6 +4,10 @@ const api = axios.create({
   baseURL: '/zabbix',
 });
 
+const glpiApi = axios.create({
+  baseURL: '/glpi',
+});
+
 // ─── Existing Interfaces ───────────────────────────────────────────
 
 export interface HostStats {
@@ -374,5 +378,56 @@ export const getSwitchUptimeHistory = async (itemid: number, from?: number, to?:
 
 export const getSwitchUptimeAvailablePeriods = async (itemid: number): Promise<AvailablePeriod[]> => {
   const { data } = await api.get<AvailablePeriod[]>(`/switch-uptime-periods/${itemid}`);
+  return data;
+};
+
+// ─── GLPI Interfaces ─────────────────────────────────────────────────────
+
+export interface GlpiKpiSummary {
+  month: string;
+  ticketsCreated: number;
+  ticketsClosed: number;
+  resolutionRate: number;
+  timeToOwn: number;
+  timeToClose: number;
+}
+
+export interface GlpiTicketVolume {
+  month: string;
+  tickets: number;
+}
+
+export interface GlpiTimeTrends {
+  timeToOwn: { month: string; value: number }[];
+  timeToClose: { month: string; value: number }[];
+}
+
+// ─── GLPI API Functions ──────────────────────────────────────────────────
+
+export const getGlpiKpiSummary = async (month?: string, type?: number): Promise<GlpiKpiSummary> => {
+  const params = new URLSearchParams();
+  if (month) params.append('month', month);
+  if (type !== undefined && type !== null) params.append('type', type.toString());
+  
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const { data } = await glpiApi.get<GlpiKpiSummary>(`/kpi-summary${query}`);
+  return data;
+};
+
+export const getGlpiTicketVolume = async (type?: number): Promise<GlpiTicketVolume[]> => {
+  const params = new URLSearchParams();
+  if (type !== undefined && type !== null) params.append('type', type.toString());
+  
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const { data } = await glpiApi.get<GlpiTicketVolume[]>(`/ticket-volume${query}`);
+  return data;
+};
+
+export const getGlpiTimeTrends = async (type?: number): Promise<GlpiTimeTrends> => {
+  const params = new URLSearchParams();
+  if (type !== undefined && type !== null) params.append('type', type.toString());
+  
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const { data } = await glpiApi.get<GlpiTimeTrends>(`/time-trends${query}`);
   return data;
 };
