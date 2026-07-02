@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { FileText, CheckCircle, Clock, TrendingUp, AlertCircle, Filter, Calendar, Target, ShieldAlert } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, TrendingUp, AlertCircle, Filter, Calendar, Target, ShieldAlert } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { BRAND } from '../styles/colors';
@@ -529,9 +529,10 @@ const GlpiDashboard: React.FC = () => {
                   <span className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none">
                     {kpiSummary.resolutionRate.toFixed(1)}%
                   </span>
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold border"
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold border inline-flex items-center gap-1"
                         style={{ backgroundColor: bgTint, borderColor: accent + '25', color: accent }}>
-                    {targetMet ? '✓ Cible 90% atteinte' : '✗ Sous la cible 90%'}
+                    {targetMet ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                    {targetMet ? 'Cible 90% atteinte' : 'Sous la cible 90%'}
                   </span>
                 </div>
                 {/* Mini progress bar */}
@@ -692,7 +693,8 @@ const GlpiDashboard: React.FC = () => {
                   <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
                     volComp.isDecrease ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-red-50 text-[#DC2626] border border-red-100'
                   }`}>
-                    {volComp.isDecrease ? '✓' : '⚠'} {volComp.isDecrease
+                    {volComp.isDecrease ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    {volComp.isDecrease
                       ? `Réduction de ~${volComp.pctChange}% vs ${volComp.prevMonthName}`
                       : `Hausse de ~${Math.abs(volComp.pctChange)}% vs ${volComp.prevMonthName}`}
                   </div>
@@ -735,7 +737,8 @@ const GlpiDashboard: React.FC = () => {
                   <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
                     ownComp.isImprovement ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-amber-50 text-[#D97706] border border-amber-100'
                   }`}>
-                    {ownComp.isImprovement ? '✓' : '⚠'} {ownComp.isImprovement
+                    {ownComp.isImprovement ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    {ownComp.isImprovement
                       ? `Prise en charge accélérée : -${ownComp.pctChange}% vs ${ownComp.prevMonthName}`
                       : `Temps de réaction allongé : +${Math.abs(ownComp.pctChange)}% vs ${ownComp.prevMonthName}`}
                   </div>
@@ -782,8 +785,9 @@ const GlpiDashboard: React.FC = () => {
                   <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
                     closeComp.isImprovement ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-amber-50 text-[#D97706] border border-amber-100'
                   }`}>
-                    {closeComp.isImprovement ? '✓' : '⚠'} {closeComp.isImprovement 
-                      ? `Résolution accélérée : -${closeComp.pctChange}% vs ${closeComp.prevMonthName}` 
+                    {closeComp.isImprovement ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                    {closeComp.isImprovement
+                      ? `Résolution accélérée : -${closeComp.pctChange}% vs ${closeComp.prevMonthName}`
                       : `Résolution allongée : +${Math.abs(closeComp.pctChange)}% vs ${closeComp.prevMonthName}`}
                   </div>
                 )}

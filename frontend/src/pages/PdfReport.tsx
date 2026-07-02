@@ -422,7 +422,7 @@ const PdfReport: React.FC = () => {
       rows.push({
         server: srv,
         indicator: `Arrêts — ${name}`,
-        value: ok ? '✓ 0 arrêt' : `${svc.incident_days} jour(s)`,
+        value: ok ? '0 arrêt' : `${svc.incident_days} jour(s)`,
         ok,
         comment: ok
           ? 'Service opérationnel en continu sur 30 jours.'
@@ -433,7 +433,7 @@ const PdfReport: React.FC = () => {
     if (u) rows.push({
       server: srv,
       indicator: 'Redémarrages (Uptime)',
-      value: u.restart_count === 0 ? '✓ 0 redémarrage' : `${u.restart_count} redém.`,
+      value: u.restart_count === 0 ? '0 redémarrage' : `${u.restart_count} redém.`,
       ok: u.restart_count === 0,
       comment: u.restart_count === 0
         ? 'Aucun redémarrage visible sur 30 jours.'
@@ -838,12 +838,13 @@ const PdfReport: React.FC = () => {
                   <td className={TDR}>{row.indicator}</td>
                   <td className={TDR}>
                     <span
-                      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold"
                       style={{
                         backgroundColor: row.ok ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)',
                         color: row.ok ? '#059669' : '#DC2626',
                       }}
                     >
+                      {row.ok ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                       {row.value}
                     </span>
                   </td>
@@ -1003,12 +1004,12 @@ const PdfReport: React.FC = () => {
                       <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
                         {hasIncident ? (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#92400E' }}>⚠ {incidentDays} jour(s) d'anomalie{firstInc ? ` — premier : ${firstInc.slice(5)}` : ''}</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{incidentDays} jour(s) d'anomalie{firstInc ? ` — premier : ${firstInc.slice(5)}` : ''}</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Consulter les logs Windows Service Control Manager</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#065F46' }}>✓ Aucun arrêt visible sur 30 jours</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#065F46' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun arrêt visible sur 30 jours</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Service opérationnel en continu</p>
                           </>
                         )}
@@ -1061,12 +1062,12 @@ const PdfReport: React.FC = () => {
                       <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
                         {hasRestart ? (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#92400E' }}>⚠ {restartDays.length} redémarrage(s) détecté(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{restartDays.length} redémarrage(s) détecté(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Vérifier les journaux Windows et les mises à jour</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#1E40AF' }}>✓ Aucun redémarrage sur 30 jours</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun redémarrage sur 30 jours</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Uptime max observé : {maxUpDays.toFixed(1)} jours</p>
                           </>
                         )}
@@ -1109,8 +1110,9 @@ const PdfReport: React.FC = () => {
                         />
                       </div>
                       <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        <p className="text-[10px] font-medium" style={{ color: ok ? '#065F46' : '#92400E' }}>
-                          {ok ? '✓' : '⚠'} Disponibilité moyenne : {avgPct.toFixed(2)}%
+                        <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: ok ? '#065F46' : '#92400E' }}>
+                          {ok ? <CheckCircle className="w-3 h-3 shrink-0" /> : <AlertCircle className="w-3 h-3 shrink-0" />}
+                          Disponibilité moyenne : {avgPct.toFixed(2)}%
                         </p>
                         <p className="text-[9.5px] text-[#64748B]">→ Minimum journalier : {minPct.toFixed(1)}%{minPct < 99 ? ' — indisponibilité à investiguer' : ''}</p>
                       </div>
@@ -1286,12 +1288,12 @@ const PdfReport: React.FC = () => {
                       <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
                         {hasRestart ? (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#92400E' }}>⚠ {restartDays.length} redémarrage(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{restartDays.length} redémarrage(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Vérifier l'alimentation et les logs SNMP</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#1E40AF' }}>✓ Aucun redémarrage sur 30 jours</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun redémarrage sur 30 jours</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Uptime max : {maxUpWeeks.toFixed(1)} semaines</p>
                           </>
                         )}
@@ -1338,12 +1340,12 @@ const PdfReport: React.FC = () => {
                       <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
                         {hasDown ? (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#991B1B' }}>⚠ {downDays.length} jour(s) de coupure SFP détecté(s)</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#991B1B' }}><AlertCircle className="w-3 h-3 shrink-0" />{downDays.length} jour(s) de coupure SFP détecté(s)</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Vérifier le câble SFP et la négociation de liaison</p>
                           </>
                         ) : (
                           <>
-                            <p className="text-[10px] font-medium" style={{ color: '#065F46' }}>✓ Liaison SFP stable — aucune coupure sur 30 jours</p>
+                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#065F46' }}><CheckCircle className="w-3 h-3 shrink-0" />Liaison SFP stable — aucune coupure sur 30 jours</p>
                             <p className="text-[9.5px] text-[#64748B]">→ Port {hostPart} opérationnel en continu</p>
                           </>
                         )}
@@ -1393,7 +1395,14 @@ const PdfReport: React.FC = () => {
                   },
                   {
                     ind: 'Taux de résolution (cible 90%)',
-                    val: `${glpiKpi.resolutionRate.toFixed(1)}% ${glpiKpi.resolutionRate >= 90 ? '✓' : '✗'}`,
+                    val: (
+                      <span className="inline-flex items-center gap-1">
+                        {glpiKpi.resolutionRate.toFixed(1)}%
+                        {glpiKpi.resolutionRate >= 90
+                          ? <CheckCircle className="w-3 h-3 shrink-0" />
+                          : <AlertCircle className="w-3 h-3 shrink-0" />}
+                      </span>
+                    ),
                     ana: glpiKpi.resolutionRate >= 90
                       ? 'Taux de résolution calculé : (clos/créés) × 100 — cible atteinte.'
                       : 'Cible non atteinte — action corrective recommandée.',
@@ -1499,8 +1508,9 @@ const PdfReport: React.FC = () => {
                             backgroundColor: volChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
                             color: volChangePct < 0 ? '#059669' : '#DC2626',
                           }}>
-                            <span className="text-[12px] font-bold">
-                              {volChangePct < 0 ? '✓ Réduction' : '⚠ Augmentation'} de ~{Math.abs(volChangePct).toFixed(1)}% vs {formatMonthFrLong(prevVol.month)}
+                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
+                              {volChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                              {volChangePct < 0 ? 'Réduction' : 'Augmentation'} de ~{Math.abs(volChangePct).toFixed(1)}% vs {formatMonthFrLong(prevVol.month)}
                             </span>
                           </div>
                           <p className="text-[11px] font-mono text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-md px-2.5 py-1.5 mb-2 inline-block">
@@ -1537,8 +1547,9 @@ const PdfReport: React.FC = () => {
                             backgroundColor: ttoChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
                             color: ttoChangePct < 0 ? '#059669' : '#DC2626',
                           }}>
-                            <span className="text-[12px] font-bold">
-                              {ttoChangePct < 0 ? '✓ Amélioration' : '⚠ Temps de réaction allongé'} : {ttoChangePct > 0 ? '+' : ''}{ttoChangePct.toFixed(1)}% vs {prvTto !== undefined ? `${prvTto.toFixed(1)} h` : 'mois précédent'}
+                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
+                              {ttoChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                              {ttoChangePct < 0 ? 'Amélioration' : 'Temps de réaction allongé'} : {ttoChangePct > 0 ? '+' : ''}{ttoChangePct.toFixed(1)}% vs {prvTto !== undefined ? `${prvTto.toFixed(1)} h` : 'mois précédent'}
                             </span>
                           </div>
                           {prvTto !== undefined && (
@@ -1582,8 +1593,9 @@ const PdfReport: React.FC = () => {
                             backgroundColor: ttcChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
                             color: ttcChangePct < 0 ? '#059669' : '#DC2626',
                           }}>
-                            <span className="text-[12px] font-bold">
-                              {ttcChangePct < 0 ? '✓ Résolution améliorée' : '⚠ Résolution allongée'} : {ttcChangePct > 0 ? '+' : ''}{ttcChangePct.toFixed(1)}% vs {prvTtc !== undefined ? `${prvTtc.toFixed(1)} h` : 'mois précédent'}
+                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
+                              {ttcChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                              {ttcChangePct < 0 ? 'Résolution améliorée' : 'Résolution allongée'} : {ttcChangePct > 0 ? '+' : ''}{ttcChangePct.toFixed(1)}% vs {prvTtc !== undefined ? `${prvTtc.toFixed(1)} h` : 'mois précédent'}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#64748B] italic">

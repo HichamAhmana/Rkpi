@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, Clock, RotateCcw, Zap, Calendar, Server } from 'lucide-react';
+import { ChevronDown, Clock, RotateCcw, Zap, Calendar, Server, CheckCircle2, AlertTriangle } from 'lucide-react';
 import {
   getUptimeHistory,
   getUptimeAvailablePeriods,
@@ -337,16 +337,20 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
   const currentPeriodRestarts = currentHistory.filter(pt => pt.had_restart === 1).length;
 
   let interpretationText = '';
-  let interpretationIcon = '✅';
+  let InterpretationIcon: React.ElementType = CheckCircle2;
+  let interpretationColor = '#10B981';
   if (currentPeriodRestarts === 0) {
     interpretationText = `No restarts detected. Server running continuously for ${formatUptimeFull(stat.current_uptime_seconds)}.`;
-    interpretationIcon = '✅';
+    InterpretationIcon = CheckCircle2;
+    interpretationColor = '#10B981';
   } else if (currentPeriodRestarts === 1) {
     interpretationText = `1 restart detected on ${formatLastRestart(stat.last_restart_time)}. Uptime dropped briefly and recovered.`;
-    interpretationIcon = '⚡';
+    InterpretationIcon = Zap;
+    interpretationColor = '#F59E0B';
   } else {
     interpretationText = `${currentPeriodRestarts} restarts detected. Review maintenance logs for planned/unplanned reboots.`;
-    interpretationIcon = '⚠️';
+    InterpretationIcon = AlertTriangle;
+    interpretationColor = '#EF4444';
   }
 
   return (
@@ -480,7 +484,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
 
         {/* Interpretation */}
         <div className="mt-3 flex items-start gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg">
-          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <InterpretationIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: interpretationColor }} />
           <p className="text-[12px] text-[#475569] leading-relaxed">{interpretationText}</p>
         </div>
       </div>

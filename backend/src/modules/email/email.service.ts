@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import * as nodemailer from 'nodemailer';
@@ -13,7 +13,7 @@ export class EmailService {
   constructor(
     private configService: ConfigService,
     private zabbixService: ZabbixService,
-    private glpiService: GlpiService,
+    @Optional() private glpiService: GlpiService | undefined,
   ) {
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),
@@ -52,6 +52,11 @@ export class EmailService {
     })();
 
     this.logger.log(`Running monthly cron for period: ${prevMonth}`);
+
+    if (!this.glpiService) {
+      this.logger.warn('GLPI is not configured (DB_GLPI_HOST unset) — skipping monthly report.');
+      return;
+    }
 
     try {
       const [glpiSummary, volumeData, uptimeStats, agentStats, switchStats] = await Promise.all([

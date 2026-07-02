@@ -515,11 +515,11 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
   // Status pill logic
   const getStatusPill = () => {
     if (lastValue === 1 && downCount === 0) {
-      return { label: '🟢 Stable', bg: '#F0FDF4', color: '#15803d' };
+      return { label: 'Stable', bg: '#F0FDF4', color: '#15803d' };
     } else if (lastValue === 1 && downCount > 0) {
-      return { label: '🟡 Recovered', bg: '#FFFBEB', color: '#B45309' };
+      return { label: 'Recovered', bg: '#FFFBEB', color: '#B45309' };
     } else {
-      return { label: '🔴 Down', bg: '#FEF2F2', color: '#DC2626' };
+      return { label: 'Down', bg: '#FEF2F2', color: '#DC2626' };
     }
   };
 
@@ -578,7 +578,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
                 className={`w-1.5 h-1.5 rounded-full ${!isStable ? 'animate-pulse' : ''}`}
                 style={{ backgroundColor: accentColor }}
               />
-              {pill.label.replace(/^[^\s]+\s+/, '')}
+              {pill.label}
             </span>
             <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#F1F5F9] hover:bg-[#E2E8F0] transition-colors flex-shrink-0">
               {isExpanded ? (

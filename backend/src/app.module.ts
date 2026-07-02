@@ -10,6 +10,11 @@ import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
+// GLPI's database may not be reachable yet (e.g. it lives on a VM that isn't
+// set up). Skip registering its connection entirely rather than crashing the
+// whole backend on boot — Zabbix-only deployments stay functional this way.
+const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -27,20 +32,24 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
       autoLoadEntities: true,
       extra: { connectionLimit: 5 },
     }),
-    TypeOrmModule.forRoot({
-      name: 'glpi',
-      type: 'mysql',
-      host: process.env.DB_GLPI_HOST ?? 'localhost',
-      port: parseInt(process.env.DB_GLPI_PORT ?? '3307'),
-      username: process.env.DB_GLPI_USER ?? 'reporter',
-      password: process.env.DB_GLPI_PASSWORD ?? 'reporterpass',
-      database: process.env.DB_GLPI_NAME ?? 'glpi',
-      synchronize: false,
-      autoLoadEntities: true,
-      extra: { connectionLimit: 5 },
-    }),
+    ...(glpiEnabled
+      ? [
+          TypeOrmModule.forRoot({
+            name: 'glpi',
+            type: 'mysql',
+            host: process.env.DB_GLPI_HOST,
+            port: parseInt(process.env.DB_GLPI_PORT ?? '3307'),
+            username: process.env.DB_GLPI_USER ?? 'reporter',
+            password: process.env.DB_GLPI_PASSWORD ?? 'reporterpass',
+            database: process.env.DB_GLPI_NAME ?? 'glpi',
+            synchronize: false,
+            autoLoadEntities: true,
+            extra: { connectionLimit: 5 },
+          }),
+        ]
+      : []),
     ZabbixModule,
-    GlpiModule,
+    ...(glpiEnabled ? [GlpiModule] : []),
     EmailModule,
     AuthModule,
   ],

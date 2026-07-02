@@ -4,13 +4,14 @@ import type { ApexOptions } from 'apexcharts';
 import { 
   ChevronDown, 
   ChevronUp, 
-  Server, 
-  Clock, 
-  Activity, 
-  Layers, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle 
+  Server,
+  Clock,
+  Activity,
+  Layers,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Zap
 } from 'lucide-react';
 import {
   getServiceHistory,
@@ -341,16 +342,20 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   const parsedName = parseServiceName(service.service_name);
 
   let interpretationText = '';
-  let interpretationIcon = '✅';
+  let InterpretationIcon: React.ElementType = CheckCircle2;
+  let interpretationColor = '#10B981';
   if (status === 'running') {
     interpretationText = 'Service running continuously with no incidents detected in the last 30 days.';
-    interpretationIcon = '✅';
+    InterpretationIcon = CheckCircle2;
+    interpretationColor = '#10B981';
   } else if (status === 'anomaly') {
     interpretationText = `${service.incident_days} incident day(s) detected in the last 30 days${service.last_incident ? `, most recently on ${formatLastIncident(service.last_incident)}` : ''}. Service is currently running.`;
-    interpretationIcon = '⚡';
+    InterpretationIcon = Zap;
+    interpretationColor = '#F59E0B';
   } else {
     interpretationText = `Service is currently stopped${service.last_incident ? ` — last incident on ${formatLastIncident(service.last_incident)}` : ''}. Immediate attention recommended.`;
-    interpretationIcon = '⚠️';
+    InterpretationIcon = AlertTriangle;
+    interpretationColor = '#EF4444';
   }
 
   return (
@@ -487,7 +492,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
 
         {/* Interpretation */}
         <div className="mt-4 flex items-start gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg">
-          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <InterpretationIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: interpretationColor }} />
           <p className="text-[12px] text-slate-500 leading-relaxed">{interpretationText}</p>
         </div>
       </div>

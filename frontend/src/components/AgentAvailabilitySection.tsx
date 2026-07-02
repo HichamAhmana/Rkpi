@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { ChevronDown, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Activity } from 'lucide-react';
+import { ChevronDown, CheckCircle2, XCircle, Clock, Shield, AlertTriangle, Activity, Zap } from 'lucide-react';
 import {
   getAgentAvailabilityHistory,
   getAgentAvailablePeriods,
@@ -298,16 +298,20 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
   const totalOutagesInPeriod = currentHistory.reduce((sum, pt) => sum + Number(pt.outages), 0);
 
   let interpretationText = '';
-  let interpretationIcon = '✅';
+  let InterpretationIcon: React.ElementType = CheckCircle2;
+  let interpretationColor = '#10B981';
   if (totalOutagesInPeriod === 0) {
     interpretationText = `Perfect availability. No outages detected in the selected period.`;
-    interpretationIcon = '✅';
+    InterpretationIcon = CheckCircle2;
+    interpretationColor = '#10B981';
   } else if (totalOutagesInPeriod <= 3) {
     interpretationText = `${totalOutagesInPeriod} outage event${totalOutagesInPeriod > 1 ? 's' : ''} detected. Minor impact on overall availability.`;
-    interpretationIcon = '⚡';
+    InterpretationIcon = Zap;
+    interpretationColor = '#F59E0B';
   } else {
     interpretationText = `${totalOutagesInPeriod} outage events detected. Review agent health and network connectivity.`;
-    interpretationIcon = '⚠️';
+    InterpretationIcon = AlertTriangle;
+    interpretationColor = '#EF4444';
   }
 
   return (
@@ -442,7 +446,7 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
 
         {/* Interpretation */}
         <div className="mt-3 flex items-start gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg">
-          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <InterpretationIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: interpretationColor }} />
           <p className="text-[12px] text-[#475569] leading-relaxed">{interpretationText}</p>
         </div>
       </div>
