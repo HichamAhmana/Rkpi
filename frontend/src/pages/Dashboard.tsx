@@ -169,6 +169,7 @@ const Dashboard: React.FC = () => {
           value={hostStats.total}
           icon={Server}
           accentColor="#2B5BA8"
+          description="Count of all hosts monitored in Zabbix"
         />
         <KPICard
           title="Online"
@@ -176,12 +177,14 @@ const Dashboard: React.FC = () => {
           icon={Monitor}
           accentColor="#3DBE7A"
           trend={{ value: 2.4, isUp: true }}
+          description="Enabled hosts with a reachable interface"
         />
         <KPICard
           title="Offline"
           value={hostStats.offline}
           icon={Monitor}
           accentColor="#EF4444"
+          description="Enabled hosts with an unreachable interface"
         />
         <KPICard
           title="Problems"
@@ -189,6 +192,7 @@ const Dashboard: React.FC = () => {
           icon={Activity}
           accentColor="#F59E0B"
           trend={{ value: 5.1, isUp: false }}
+          description="Count of triggers currently in problem state"
         />
       </div>
 

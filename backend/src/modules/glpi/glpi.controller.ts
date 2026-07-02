@@ -1,13 +1,18 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { GlpiService } from './glpi.service';
 import { KpiSummaryResponseDto } from './dto/kpi-summary.dto';
 import { TicketVolumeDto } from './dto/ticket-volume.dto';
 import { TimeTrendsDto } from './dto/time-trends.dto';
 
+const MIN = 60_000;
+
+@UseInterceptors(CacheInterceptor)
 @Controller('glpi')
 export class GlpiController {
   constructor(private readonly glpiService: GlpiService) {}
 
+  @CacheTTL(5 * MIN)
   @Get('kpi-summary')
   async getKpiSummary(
     @Query('month') month?: string,
@@ -19,6 +24,7 @@ export class GlpiController {
     return this.glpiService.getKpiSummary(targetMonth, parsedType);
   }
 
+  @CacheTTL(5 * MIN)
   @Get('ticket-volume')
   async getTicketVolume(
     @Query('type') type?: string,
@@ -27,6 +33,7 @@ export class GlpiController {
     return this.glpiService.getTicketVolume(parsedType);
   }
 
+  @CacheTTL(5 * MIN)
   @Get('time-trends')
   async getTimeTrends(
     @Query('type') type?: string,

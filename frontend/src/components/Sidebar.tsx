@@ -1,108 +1,224 @@
 import React, { useState } from 'react';
-import { LayoutGrid, Monitor, X, ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface NavItem {
-  id: 'zabbix' | 'glpi';
-  label: string;
-  icon: React.ElementType;
-}
-
-const navItems: NavItem[] = [
-  { id: 'zabbix', label: 'Zabbix M', icon: LayoutGrid },
-  { id: 'glpi', label: 'GLPI M', icon: Monitor },
-];
+import { LayoutGrid, ClipboardList, FileText, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BRAND } from '../styles/colors';
+import logoImg from '../../assets/logo.png';
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  activeTab: 'zabbix' | 'glpi';
-  onTabChange: (tab: 'zabbix' | 'glpi') => void;
+  activeTab: 'zabbix' | 'glpi' | 'report';
+  onTabChange: (tab: 'zabbix' | 'glpi' | 'report') => void;
 }
 
+const NAV = [
+  { id: 'zabbix' as const, label: 'Supervision',  sub: 'Infrastructure · Zabbix', icon: LayoutGrid },
+  { id: 'glpi'   as const, label: 'Helpdesk',     sub: 'Tickets · GLPI',          icon: ClipboardList },
+  { id: 'report' as const, label: 'Rapport',      sub: 'KPI · Export PDF',        icon: FileText },
+];
+
+// sidebar palette
+const C = {
+  bg:        'linear-gradient(175deg, #071929 0%, #0D2340 55%, #071929 100%)',
+  border:    'rgba(255,255,255,0.07)',
+  muted:     'rgba(255,255,255,0.28)',
+  inactive:  'rgba(255,255,255,0.52)',
+  active:    '#ffffff',
+  activeBg:  'rgba(255,255,255,0.09)',
+  hoverBg:   'rgba(255,255,255,0.055)',
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, activeTab, onTabChange }) => {
-  // Desktop collapse state
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={onToggle}
         />
       )}
 
-      {/* Sidebar Container */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-screen bg-white flex flex-col
-          border-r border-[#E2E8F0]
-          transition-all duration-200 ease-in-out
+          fixed top-0 left-0 z-50 h-screen flex flex-col
           lg:translate-x-0 lg:static lg:z-auto
+          transition-all duration-200 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isCollapsed ? 'lg:w-[76px]' : 'lg:w-[240px]'}
-          w-[240px]
+          ${isCollapsed ? 'lg:w-17' : 'lg:w-58'}
+          w-58
         `}
+        style={{
+          background: C.bg,
+          borderRight: `1px solid ${C.border}`,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
       >
-        {/* Logo Header */}
-        <div className={`h-16 flex items-center justify-between border-b border-[#E2E8F0] px-6 transition-all duration-200 ${isCollapsed ? 'lg:px-4 lg:justify-center' : ''}`}>
-          <span className="text-[22px] font-bold text-[#2B5BA8] tracking-tight whitespace-nowrap transition-all duration-200">
-            {isCollapsed ? 'R' : 'RKpi'}
-          </span>
-          
-          {/* Mobile close button / Desktop collapse toggle button */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onToggle}
-              className="lg:hidden p-1 rounded-md hover:bg-[#F0F7FF] text-[#64748B] transition-colors duration-150"
+        {/* dot-grid texture */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* right-edge accent strip */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 2,
+            height: '100%',
+            background: `linear-gradient(to bottom, transparent 0%, ${BRAND.green}60 40%, ${BRAND.tealBlue}40 70%, transparent 100%)`,
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* ── HEADER ──────────────────────────────────────────────────────── */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isCollapsed ? 'center' : 'space-between',
+            padding: isCollapsed ? '0' : '0 16px 0 20px',
+            borderBottom: `1px solid ${C.border}`,
+            flexShrink: 0,
+          }}
+        >
+          {isCollapsed ? (
+            <span
+              style={{
+                fontSize: 22,
+                fontWeight: 900,
+                color: BRAND.darkBlue,
+                letterSpacing: -1,
+                lineHeight: 1,
+              }}
             >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+              R
+            </span>
+          ) : (
+            <>
+              <img
+                src={logoImg}
+                alt="Arwamedic"
+                style={{ height: 30, objectFit: 'contain', flexShrink: 0 }}
+              />
+              <button
+                onClick={onToggle}
+                className="lg:hidden"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 6,
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  color: C.inactive,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Navigation Layer */}
-        <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-          <ul className="space-y-1 px-3 transition-all duration-200">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.id === activeTab;
+        {/* ── NAV ──────────────────────────────────────────────────────────── */}
+        <nav
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            flex: 1,
+            padding: isCollapsed ? '16px 8px' : '16px 10px',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
+          {!isCollapsed && (
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: C.muted,
+                letterSpacing: '0.09em',
+                textTransform: 'uppercase',
+                padding: '0 10px',
+                margin: '0 0 10px',
+              }}
+            >
+              Navigation
+            </p>
+          )}
+
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {NAV.map(({ id, label, sub, icon: Icon }) => {
+              const active = id === activeTab;
+              const isHov = hovered === id && !active;
               return (
-                <li key={item.id}>
+                <li key={id}>
                   <a
                     href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onTabChange(item.id);
+                    onClick={e => { e.preventDefault(); onTabChange(id); }}
+                    onMouseEnter={() => setHovered(id)}
+                    onMouseLeave={() => setHovered(null)}
+                    title={isCollapsed ? label : undefined}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: isCollapsed ? 0 : 11,
+                      justifyContent: isCollapsed ? 'center' : 'flex-start',
+                      padding: isCollapsed ? '11px 0' : '10px 10px',
+                      borderRadius: 10,
+                      textDecoration: 'none',
+                      backgroundColor: active ? C.activeBg : isHov ? C.hoverBg : 'transparent',
+                      borderLeft: active ? `2px solid ${BRAND.green}` : '2px solid transparent',
+                      transition: 'background-color 120ms, border-color 120ms',
                     }}
-                    title={isCollapsed ? item.label : undefined}
-                    className={`
-                      flex items-center rounded-lg text-[14px]
-                      transition-all duration-150 relative group
-                      ${isCollapsed ? 'lg:justify-center lg:px-0 lg:py-3' : 'gap-3 px-3 py-2.5'}
-                      ${isActive
-                        ? 'bg-[#EFF6FF] text-[#2B5BA8] font-semibold'
-                        : 'text-[#64748B] hover:bg-[#F0F7FF] hover:text-[#2B5BA8]'
-                      }
-                    `}
-                    style={
-                      isActive 
-                        ? { borderLeft: '3px solid #2B5BA8' } 
-                        : { borderLeft: '3px solid transparent' }
-                    }
                   >
-                    <Icon className="w-[18px] h-[18px] shrink-0" />
-                    
-                    {/* Collapsible text element */}
-                    <span 
-                      className={`
-                        transition-all duration-200 whitespace-nowrap
-                        ${isCollapsed ? 'lg:opacity-0 lg:w-0 lg:overflow-hidden' : 'opacity-100'}
-                      `}
-                    >
-                      {item.label}
-                    </span>
+                    <Icon
+                      size={17}
+                      color={active ? '#fff' : isHov ? 'rgba(255,255,255,0.75)' : C.inactive}
+                      style={{ flexShrink: 0, transition: 'color 120ms' }}
+                    />
+                    {!isCollapsed && (
+                      <div style={{ minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontSize: 13,
+                            fontWeight: active ? 600 : 500,
+                            color: active ? C.active : isHov ? 'rgba(255,255,255,0.80)' : C.inactive,
+                            margin: 0,
+                            lineHeight: 1.3,
+                            transition: 'color 120ms',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {label}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: active ? 'rgba(255,255,255,0.45)' : C.muted,
+                            margin: 0,
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {sub}
+                        </p>
+                      </div>
+                    )}
                   </a>
                 </li>
               );
@@ -110,28 +226,68 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, activeTab, onTabCha
           </ul>
         </nav>
 
-        {/* Action Tray & System Status Footer */}
-        <div className="border-t border-[#E2E8F0] bg-white flex flex-col">
-          {/* Desktop Expand/Collapse Trigger Arrow */}
+        {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            borderTop: `1px solid ${C.border}`,
+            flexShrink: 0,
+          }}
+        >
+          {/* collapse toggle (desktop only) */}
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex items-center justify-center py-2 text-[#64748B] hover:text-[#2B5BA8] hover:bg-[#F0F7FF] transition-colors duration-150 border-b border-[#E2E8F0]"
+            className="hidden lg:flex"
+            onClick={() => setIsCollapsed(v => !v)}
+            style={{
+              width: '100%',
+              alignItems: 'center',
+              gap: 8,
+              padding: isCollapsed ? '12px 0' : '10px 20px',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: C.muted,
+              fontSize: 12,
+              borderBottom: `1px solid ${C.border}`,
+              transition: 'color 150ms',
+            }}
+            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = C.inactive)}
+            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = C.muted)}
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {isCollapsed
+              ? <ChevronRight size={14} />
+              : <><ChevronLeft size={14} /><span>Réduire</span></>
+            }
           </button>
 
-          <div className={`py-4 transition-all duration-200 ${isCollapsed ? 'lg:px-0 lg:flex lg:justify-center' : 'px-6'}`}>
-            <div className="flex items-center gap-2" title={isCollapsed ? "All systems operational" : undefined}>
-              <span className="w-2 h-2 rounded-full bg-[#3DBE7A] shrink-0" />
-              <span 
-                className={`
-                  text-[12px] text-[#94A3B8] whitespace-nowrap transition-all duration-200
-                  ${isCollapsed ? 'lg:opacity-0 lg:w-0 lg:overflow-hidden' : 'opacity-100'}
-                `}
-              >
-                All systems operational
+          {/* status line */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              gap: 7,
+              padding: isCollapsed ? '12px 0' : '12px 20px',
+            }}
+            title={isCollapsed ? 'Tous systèmes opérationnels' : undefined}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: BRAND.green,
+                flexShrink: 0,
+                boxShadow: `0 0 6px ${BRAND.green}80`,
+              }}
+            />
+            {!isCollapsed && (
+              <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>
+                Tous systèmes opérationnels
               </span>
-            </div>
+            )}
           </div>
         </div>
       </aside>

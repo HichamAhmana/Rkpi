@@ -1,11 +1,27 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: '/zabbix',
-});
+const TOKEN_KEY = 'rkpi_token';
 
-const glpiApi = axios.create({
-  baseURL: '/glpi',
+const authInterceptor = (config: import('axios').InternalAxiosRequestConfig) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+};
+
+const unauthorizedInterceptor = (error: unknown) => {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.reload();
+  }
+  return Promise.reject(error);
+};
+
+const api = axios.create({ baseURL: '/zabbix' });
+const glpiApi = axios.create({ baseURL: '/glpi' });
+
+[api, glpiApi].forEach(instance => {
+  instance.interceptors.request.use(authInterceptor);
+  instance.interceptors.response.use(undefined, unauthorizedInterceptor);
 });
 
 // ─── Existing Interfaces ───────────────────────────────────────────
@@ -426,8 +442,65 @@ export const getGlpiTicketVolume = async (type?: number): Promise<GlpiTicketVolu
 export const getGlpiTimeTrends = async (type?: number): Promise<GlpiTimeTrends> => {
   const params = new URLSearchParams();
   if (type !== undefined && type !== null) params.append('type', type.toString());
-  
+
   const query = params.toString() ? `?${params.toString()}` : '';
   const { data } = await glpiApi.get<GlpiTimeTrends>(`/time-trends${query}`);
   return data;
+};
+
+// ─── Report Charts (30-day daily histories for all monitored items) ─────────
+
+export interface ChartDayRaw {
+  day: string;
+  min: number;
+  max: number;
+  avg: number;
+}
+
+export interface AgentChartDay {
+  day: string;
+  avail_pct: number;
+}
+
+export interface ReportChartItem {
+  itemid: number;
+  label: string;
+  host: string;
+  type: 'service' | 'uptime' | 'agent' | 'sfp' | 'switch_uptime';
+  service: string;
+  data: ChartDayRaw[];
+}
+
+export interface ReportAgentItem {
+  itemid: number;
+  label: string;
+  host: string;
+  type: 'agent';
+  service: string;
+  data: AgentChartDay[];
+}
+
+export interface ZabbixReportCharts {
+  services: ReportChartItem[];
+  uptimes: ReportChartItem[];
+  agents: ReportAgentItem[];
+  sfpPorts: ReportChartItem[];
+  switchUptimes: ReportChartItem[];
+}
+
+export const getZabbixReportCharts = async (): Promise<ZabbixReportCharts> => {
+  const { data } = await api.get<ZabbixReportCharts>('/report-charts');
+  return data;
+};
+
+// ─── Email / Report API ──────────────────────────────────────────────────
+
+const reportApi = axios.create({ baseURL: '/report' });
+
+export const sendReportByEmail = async (
+  pdfBase64: string,
+  filename: string,
+  monthLabel: string,
+): Promise<void> => {
+  await reportApi.post('/send-email', { pdfBase64, filename, monthLabel });
 };

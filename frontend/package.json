@@ -13,6 +13,9 @@
     "apexcharts": "^5.15.0",
     "axios": "^1.17.0",
     "clsx": "^2.1.1",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.17.0",
     "react": "^19.2.6",
     "react-apexcharts": "^2.1.0",
@@ -37,5 +40,11 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"
+  },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.2.0",
+      "multer": "^2.2.0"
+    }
   }
 }

@@ -1,12 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CacheModule } from '@nestjs/cache-manager';
+import { APP_GUARD } from '@nestjs/core';
 import { ZabbixModule } from './zabbix/zabbix.module';
 import { GlpiModule } from './modules/glpi/glpi.module';
+import { EmailModule } from './modules/email/email.module';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.register({ isGlobal: true, ttl: 60_000, max: 200 }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       name: 'zabbix',
       type: 'mysql',
@@ -17,6 +25,7 @@ import { GlpiModule } from './modules/glpi/glpi.module';
       database: process.env.DB_ZABBIX_NAME ?? 'zabbix',
       synchronize: false,
       autoLoadEntities: true,
+      extra: { connectionLimit: 5 },
     }),
     TypeOrmModule.forRoot({
       name: 'glpi',
@@ -28,9 +37,13 @@ import { GlpiModule } from './modules/glpi/glpi.module';
       database: process.env.DB_GLPI_NAME ?? 'glpi',
       synchronize: false,
       autoLoadEntities: true,
+      extra: { connectionLimit: 5 },
     }),
     ZabbixModule,
     GlpiModule,
+    EmailModule,
+    AuthModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
 export class AppModule {}

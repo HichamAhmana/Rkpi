@@ -5,5 +5,6 @@ import { ZabbixController } from './zabbix.controller';
 @Module({
   controllers: [ZabbixController],
   providers: [ZabbixService],
+  exports: [ZabbixService],
 })
 export class ZabbixModule {}

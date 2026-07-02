@@ -712,4 +712,274 @@ export class ZabbixService {
       month: Number(r.month),
     }));
   }
+
+  // ─── Report Charts (one call fetches all 30-day daily histories) ──────────
+
+  private async getEffectiveFrom(
+    itemid: number,
+    fromTs: number,
+  ): Promise<number> {
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT MAX(clock) as max_clock FROM history_uint WHERE itemid = ?`,
+      [itemid],
+    );
+    const maxClock =
+      Number(rows[0]?.max_clock) || Math.floor(Date.now() / 1000);
+    // Anchor to max(clock) so that Zabbix collection gaps don't yield empty results
+    return Math.min(fromTs, maxClock - 30 * 24 * 3600);
+  }
+
+  private async dailyHistUint(
+    itemid: number,
+    fromTs: number,
+  ): Promise<{ day: string; min: number; max: number; avg: number }[]> {
+    const effectiveFrom = await this.getEffectiveFrom(itemid, fromTs);
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT
+         DATE_FORMAT(FROM_UNIXTIME(clock), '%Y-%m-%d') as day,
+         MIN(value) as min,
+         MAX(value) as max,
+         ROUND(AVG(value), 4) as avg
+       FROM history_uint
+       WHERE itemid = ? AND clock >= ?
+       GROUP BY DATE_FORMAT(FROM_UNIXTIME(clock), '%Y-%m-%d')
+       ORDER BY day ASC`,
+      [itemid, effectiveFrom],
+    );
+    return rows.map((r: any) => ({
+      day: String(r.day),
+      min: Number(r.min),
+      max: Number(r.max),
+      avg: Number(r.avg),
+    }));
+  }
+
+  private async dailyAgentAvail(
+    itemid: number,
+    fromTs: number,
+  ): Promise<{ day: string; avail_pct: number }[]> {
+    const effectiveFrom = await this.getEffectiveFrom(itemid, fromTs);
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT
+         DATE_FORMAT(FROM_UNIXTIME(clock), '%Y-%m-%d') as day,
+         ROUND(AVG(CASE WHEN value = 1 THEN 100.0 ELSE 0.0 END), 2) as avail_pct
+       FROM history_uint
+       WHERE itemid = ? AND clock >= ?
+       GROUP BY DATE_FORMAT(FROM_UNIXTIME(clock), '%Y-%m-%d')
+       ORDER BY day ASC`,
+      [itemid, effectiveFrom],
+    );
+    return rows.map((r: any) => ({
+      day: String(r.day),
+      avail_pct: Number(r.avail_pct),
+    }));
+  }
+
+  async getReportCharts(): Promise<unknown> {
+    const fromTs = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
+
+    const SERVICE_DEFS = [
+      {
+        itemid: 64317,
+        label: 'SAGE-SRV – État du service MSSQL$SAGE100',
+        host: 'SAGE-SRV',
+        type: 'service',
+        service: 'MSSQL$SAGE100',
+      },
+      {
+        itemid: 64336,
+        label: 'SAGE-SRV – État du service SQLAgent$SAGE100',
+        host: 'SAGE-SRV',
+        type: 'service',
+        service: 'SQLAgent$SAGE100',
+      },
+      {
+        itemid: 64319,
+        label: 'SAGE-SRV – État du service Netlogon',
+        host: 'SAGE-SRV',
+        type: 'service',
+        service: 'Netlogon',
+      },
+      {
+        itemid: 62724,
+        label: 'DC-SRV – État du service NTDS (AD DS)',
+        host: 'DC-SRV',
+        type: 'service',
+        service: 'NTDS',
+      },
+      {
+        itemid: 62703,
+        label: 'DC-SRV – État du service DNS',
+        host: 'DC-SRV',
+        type: 'service',
+        service: 'DNS',
+      },
+      {
+        itemid: 62713,
+        label: 'DC-SRV – État du service KDC (Kerberos)',
+        host: 'DC-SRV',
+        type: 'service',
+        service: 'KDC',
+      },
+      {
+        itemid: 62721,
+        label: 'DC-SRV – État du service Netlogon',
+        host: 'DC-SRV',
+        type: 'service',
+        service: 'Netlogon',
+      },
+      {
+        itemid: 62753,
+        label: 'DC-SRV – État du service vmms (Hyper-V)',
+        host: 'DC-SRV',
+        type: 'service',
+        service: 'vmms',
+      },
+    ];
+
+    const UPTIME_DEFS = [
+      {
+        itemid: 64202,
+        label: 'SAGE-SRV – Uptime (redémarrages)',
+        host: 'SAGE-SRV',
+        type: 'uptime',
+        service: '',
+      },
+      {
+        itemid: 62651,
+        label: 'DC-SRV – Uptime (redémarrages)',
+        host: 'DC-SRV',
+        type: 'uptime',
+        service: '',
+      },
+    ];
+
+    const AGENT_DEFS = [
+      {
+        itemid: 64209,
+        label: 'SAGE-SRV – Disponibilité agent Zabbix',
+        host: 'SAGE-SRV',
+        type: 'agent',
+        service: '',
+      },
+      {
+        itemid: 62658,
+        label: 'DC-SRV – Disponibilité agent Zabbix',
+        host: 'DC-SRV',
+        type: 'agent',
+        service: '',
+      },
+    ];
+
+    const SFP_DEFS: {
+      itemid: number;
+      label: string;
+      host: string;
+      type: string;
+      service: string;
+    }[] = [
+      {
+        itemid: 64499,
+        label: 'SW1 – Port SFP 49',
+        host: 'SW1',
+        type: 'sfp',
+        service: '',
+      },
+      {
+        itemid: 64501,
+        label: 'SW1 – Port SFP 50',
+        host: 'SW1',
+        type: 'sfp',
+        service: '',
+      },
+      {
+        itemid: 64502,
+        label: 'SW1 – Port SFP 51',
+        host: 'SW1',
+        type: 'sfp',
+        service: '',
+      },
+    ];
+
+    // Dynamic lookup for SW-AQ / SW-QVM SFP port 49
+    const dynSfp: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as switch_name
+       FROM items i JOIN hosts h ON h.hostid = i.hostid
+       WHERE h.name IN ('SW-AQ','SW-QVM') AND i.key_ LIKE 'ifOperStatus.49'
+       ORDER BY h.name`,
+    );
+    dynSfp.forEach((r: any) => {
+      SFP_DEFS.push({
+        itemid: Number(r.itemid),
+        label: `${String(r.switch_name)} – Port SFP 49`,
+        host: String(r.switch_name),
+        type: 'sfp',
+        service: '',
+      });
+    });
+
+    // Switch uptimes — one representative item per switch host
+    const swRows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as switch_name
+       FROM items i JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.itemid IN (64359,68052,67018,67802,68230,67660)
+       ORDER BY h.name, i.itemid`,
+    );
+    const seenSw = new Set<string>();
+    const SWITCH_DEFS: {
+      itemid: number;
+      label: string;
+      host: string;
+      type: string;
+      service: string;
+    }[] = [];
+    swRows.forEach((r: any) => {
+      if (!seenSw.has(String(r.switch_name))) {
+        seenSw.add(String(r.switch_name));
+        SWITCH_DEFS.push({
+          itemid: Number(r.itemid),
+          label: `${String(r.switch_name)} – Uptime`,
+          host: String(r.switch_name),
+          type: 'switch_uptime',
+          service: '',
+        });
+      }
+    });
+
+    const [services, uptimes, agents, sfpPorts, switchUptimes] =
+      await Promise.all([
+        Promise.all(
+          SERVICE_DEFS.map(async (d) => ({
+            ...d,
+            data: await this.dailyHistUint(d.itemid, fromTs),
+          })),
+        ),
+        Promise.all(
+          UPTIME_DEFS.map(async (d) => ({
+            ...d,
+            data: await this.dailyHistUint(d.itemid, fromTs),
+          })),
+        ),
+        Promise.all(
+          AGENT_DEFS.map(async (d) => ({
+            ...d,
+            data: await this.dailyAgentAvail(d.itemid, fromTs),
+          })),
+        ),
+        Promise.all(
+          SFP_DEFS.map(async (d) => ({
+            ...d,
+            data: await this.dailyHistUint(d.itemid, fromTs),
+          })),
+        ),
+        Promise.all(
+          SWITCH_DEFS.map(async (d) => ({
+            ...d,
+            data: await this.dailyHistUint(d.itemid, fromTs),
+          })),
+        ),
+      ]);
+
+    return { services, uptimes, agents, sfpPorts, switchUptimes };
+  }
 }

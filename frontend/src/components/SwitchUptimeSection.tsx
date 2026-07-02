@@ -107,7 +107,12 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      return { key: `sw-${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
+      if (activePreset === 30) {
+        return { key: `sw-${itemid}-preset-30`, from: undefined, to: undefined };
+      }
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - activePreset * 24 * 60 * 60;
+      return { key: `sw-${itemid}-preset-${activePreset}`, from, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -179,37 +184,49 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
     chart: {
       type: 'bar',
       toolbar: { show: false },
-      animations: { enabled: false },
+      animations: { enabled: true, speed: 400 },
       fontFamily: 'Inter, sans-serif',
     },
     colors: barColors,
     plotOptions: {
       bar: {
-        borderRadius: 2,
-        columnWidth: '60%',
+        borderRadius: 4,
+        borderRadiusApplication: 'end',
+        columnWidth: '48%',
         distributed: true,
       },
+    },
+    states: {
+      hover: { filter: { type: 'darken' } },
+      active: { filter: { type: 'darken' } },
     },
     dataLabels: { enabled: false },
     legend: { show: false },
     grid: {
-      borderColor: '#F1F5F9',
-      strokeDashArray: 4,
+      borderColor: '#EEF2F7',
+      strokeDashArray: 0,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
+      padding: { left: 8, right: 8, top: -4 },
     },
     xaxis: {
-      type: 'category',
+      type: 'datetime',
+      min: currentSelectionParams?.from ? currentSelectionParams.from * 1000 : undefined,
+      max: currentSelectionParams?.to ? currentSelectionParams.to * 1000 : undefined,
       labels: {
         formatter: (value: string) => {
           if (!value) return '';
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0, 3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '10.5px', fontWeight: 500 },
+        rotate: 0,
+        rotateAlways: false,
+        hideOverlappingLabels: true,
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
+      tooltip: { enabled: false },
     },
     yaxis: {
       min: 0,
@@ -222,11 +239,17 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
       yaxis: [
         {
           y: 1,
-          borderColor: '#94A3B8',
+          borderColor: '#CBD5E1',
           strokeDashArray: 4,
           label: {
-            borderColor: '#94A3B8',
-            style: { color: '#fff', background: '#94A3B8', fontSize: '10px' },
+            borderColor: 'transparent',
+            style: {
+              color: '#94A3B8',
+              background: '#F8FAFC',
+              fontSize: '10px',
+              fontWeight: 600,
+              padding: { left: 5, right: 5, top: 2, bottom: 2 },
+            },
             text: '1 day',
           },
         },
@@ -237,15 +260,19 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
         const d = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
         const date = new Date(d.x);
         const dayStr = `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
-        const uptimeStr = formatUptimeShort(d.max_uptime_seconds);
-        const statusStr = d.had_restart === 1
-          ? `<span style="color:#EF4444;font-weight:600">↻ Restarted</span>`
-          : `<span style="color:#3DBE7A;font-weight:600">✓ Stable</span>`;
+        const statusColor = d.had_restart === 1 ? '#EF4444' : '#2B5BA8';
+        const statusText = d.had_restart === 1 ? 'Restarted' : 'Stable';
         return `
-          <div class="px-3 py-2 bg-white shadow-lg rounded border border-[#E2E8F0] text-[12px] text-[#0F172A]">
-            <div class="font-bold mb-1">${dayStr}</div>
-            <div><span style="color:#64748B;font-weight:600">Uptime: </span>${uptimeStr}</div>
-            <div>${statusStr}</div>
+          <div style="padding:10px 13px;background:#fff;box-shadow:0 12px 28px rgba(15,23,42,0.14);border-radius:10px;border:1px solid #E2E8F0;font-family:Inter,sans-serif;min-width:148px">
+            <div style="font-size:11px;font-weight:700;color:#0F172A;margin-bottom:7px">${dayStr}</div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px">
+              <span style="font-size:11px;color:#94A3B8">Uptime</span>
+              <span style="font-size:13px;font-weight:700;color:#0F172A">${formatUptimeShort(d.max_uptime_seconds)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;margin-top:6px">
+              <span style="width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></span>
+              <span style="font-size:11px;font-weight:600;color:${statusColor}">${statusText}</span>
+            </div>
           </div>
         `;
       },
@@ -570,6 +597,10 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
               }}
             />
           </div>
+          {/* Calculation explanation */}
+          <p className="text-[10px] text-label mt-1.5">
+            {portPct}% = {stat.up_ports} ports up ÷ {stat.total_ports} total × 100
+          </p>
         </div>
 
         {/* Bottom Row: Mini Stat Pills (full card width grid - 4 columns) */}

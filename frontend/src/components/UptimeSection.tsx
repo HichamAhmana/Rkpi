@@ -147,7 +147,12 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
+      if (activePreset === 30) {
+        return { key: `${itemid}-preset-30`, from: undefined, to: undefined };
+      }
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - activePreset * 24 * 60 * 60;
+      return { key: `${itemid}-preset-${activePreset}`, from, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -229,40 +234,48 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
     chart: {
       type: 'bar',
       toolbar: { show: false },
-      animations: { enabled: true, speed: 600 },
+      animations: { enabled: true, speed: 400 },
       fontFamily: 'Inter, sans-serif',
     },
     colors: barColors,
     plotOptions: {
       bar: {
-        borderRadius: 3,
-        columnWidth: '55%',
+        borderRadius: 4,
+        borderRadiusApplication: 'end',
+        columnWidth: '48%',
         distributed: true,
       }
+    },
+    states: {
+      hover: { filter: { type: 'darken' } },
+      active: { filter: { type: 'darken' } },
     },
     dataLabels: { enabled: false },
     legend: { show: false },
     grid: {
-      borderColor: '#F1F5F9',
-      strokeDashArray: 4,
+      borderColor: '#EEF2F7',
+      strokeDashArray: 0,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
-      padding: { left: 8, right: 8 },
+      padding: { left: 8, right: 8, top: -4 },
     },
     xaxis: {
-      type: 'category',
+      type: 'datetime',
+      min: currentSelectionParams?.from ? currentSelectionParams.from * 1000 : undefined,
+      max: currentSelectionParams?.to ? currentSelectionParams.to * 1000 : undefined,
       labels: {
         formatter: function (value) {
-          if (!value) return '';
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0,3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '10px' },
-        rotate: -45,
+        style: { colors: '#94A3B8', fontSize: '10.5px', fontWeight: 500 },
+        rotate: 0,
         rotateAlways: false,
+        hideOverlappingLabels: true,
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
+      tooltip: { enabled: false },
     },
     yaxis: {
       min: 0,
@@ -276,14 +289,15 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
         {
           y: 1,
           borderColor: '#CBD5E1',
-          strokeDashArray: 6,
+          strokeDashArray: 4,
           label: {
             borderColor: 'transparent',
             style: {
               color: '#94A3B8',
-              background: 'transparent',
+              background: '#F8FAFC',
               fontSize: '10px',
-              padding: { left: 4, right: 4, top: 2, bottom: 2 },
+              fontWeight: 600,
+              padding: { left: 5, right: 5, top: 2, bottom: 2 },
             },
             text: '1 day'
           }
@@ -295,14 +309,19 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
         const data = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
         const date = new Date(data.x);
         const dayStr = `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
-        const restartNotice = data.had_restart === 1 
-          ? `<div style="color:#EF4444;font-weight:600;margin-top:4px">↻ Server restarted</div>` 
-          : '';
+        const statusColor = data.had_restart === 1 ? '#EF4444' : '#2B5BA8';
+        const statusText = data.had_restart === 1 ? 'Restarted' : 'Stable';
         return `
-          <div style="padding:8px 12px;background:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.12);border-radius:8px;border:1px solid #E2E8F0;font-size:12px;color:#0F172A">
-            <div style="font-weight:700;margin-bottom:4px">${dayStr}</div>
-            <div><span style="color:#64748B">Max uptime:</span> ${formatUptimeShort(data.max_uptime_seconds)}</div>
-            ${restartNotice}
+          <div style="padding:10px 13px;background:#fff;box-shadow:0 12px 28px rgba(15,23,42,0.14);border-radius:10px;border:1px solid #E2E8F0;font-family:Inter,sans-serif;min-width:148px">
+            <div style="font-size:11px;font-weight:700;color:#0F172A;margin-bottom:7px">${dayStr}</div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px">
+              <span style="font-size:11px;color:#94A3B8">Max uptime</span>
+              <span style="font-size:13px;font-weight:700;color:#0F172A">${formatUptimeShort(data.max_uptime_seconds)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;margin-top:6px">
+              <span style="width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></span>
+              <span style="font-size:11px;font-weight:600;color:${statusColor}">${statusText}</span>
+            </div>
           </div>
         `;
       }
@@ -602,6 +621,10 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
               <span className="text-[11px] font-bold text-[#94A3B8]">m</span>
             </div>
             <p className="text-[11px] text-[#94A3B8]">{bootDateStr}</p>
+            {/* Calculation explanation */}
+            <p className="text-[10px] text-label mt-1">
+              Ring {Math.round(uptimePercent)}% = current uptime ÷ 30 days × 100
+            </p>
           </div>
         </div>
 

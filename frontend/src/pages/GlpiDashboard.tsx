@@ -31,6 +31,8 @@ const GlpiDashboard: React.FC = () => {
   const [kpiSummary, setKpiSummary] = useState<GlpiKpiSummary | null>(null);
   const [volumeData, setVolumeData] = useState<GlpiTicketVolume[]>([]);
   const [timeTrends, setTimeTrends] = useState<GlpiTimeTrends | null>(null);
+  const [incidentTimeTrends, setIncidentTimeTrends] = useState<GlpiTimeTrends | null>(null);
+  const [demandTimeTrends, setDemandTimeTrends] = useState<GlpiTimeTrends | null>(null);
 
   const isMountedRef = useRef(true);
   const hasLoadedOnceRef = useRef(false);
@@ -41,16 +43,20 @@ const GlpiDashboard: React.FC = () => {
         setInitialLoading(true);
       }
 
-      const [summary, volume, trends] = await Promise.all([
+      const [summary, volume, trends, incidentTrends, demandTrends] = await Promise.all([
         getGlpiKpiSummary(selectedMonth, ticketType),
         getGlpiTicketVolume(ticketType),
         getGlpiTimeTrends(ticketType),
+        getGlpiTimeTrends(1), // Incident
+        getGlpiTimeTrends(2), // Demand
       ]);
 
       if (isMountedRef.current) {
         setKpiSummary(summary);
         setVolumeData(volume);
         setTimeTrends(trends);
+        setIncidentTimeTrends(incidentTrends);
+        setDemandTimeTrends(demandTrends);
         setError(null);
 
         if (!hasLoadedOnceRef.current) {
@@ -85,7 +91,7 @@ const GlpiDashboard: React.FC = () => {
     return <DashboardSkeleton />;
   }
 
-  if (error || !kpiSummary || !timeTrends) {
+  if (error || !kpiSummary || !timeTrends || !incidentTimeTrends || !demandTimeTrends) {
     return (
       <div className="flex items-center justify-center h-full min-h-[500px]">
         <div
@@ -261,8 +267,8 @@ const GlpiDashboard: React.FC = () => {
     },
   ];
 
-  // Time Trends Chart Options
-  const timeChartOptions: ApexOptions = {
+  // Time Trends Chart Options Helper
+  const createTimeChartOptions = (trends: GlpiTimeTrends): ApexOptions => ({
     chart: {
       type: 'area',
       fontFamily: 'Inter, sans-serif',
@@ -273,7 +279,7 @@ const GlpiDashboard: React.FC = () => {
     stroke: { curve: 'smooth', width: 2.5 },
     dataLabels: { enabled: false },
     xaxis: {
-      categories: timeTrends.timeToOwn.map((d) => d.month),
+      categories: trends.timeToOwn.map((d) => d.month),
       labels: {
         style: { colors: '#94A3B8', fontSize: '11px' },
         formatter: formatMonthFr,
@@ -314,16 +320,27 @@ const GlpiDashboard: React.FC = () => {
       theme: 'light',
       y: { formatter: (val) => `${val.toFixed(1)} h` },
     },
-  };
+  });
 
-  const timeChartSeries = [
+  const incidentChartSeries = [
     {
       name: 'Time to Own (Prise en Charge)',
-      data: timeTrends.timeToOwn.map((d) => d.value),
+      data: incidentTimeTrends.timeToOwn.map((d) => d.value),
     },
     {
       name: 'Time to Close (Clôture)',
-      data: timeTrends.timeToClose.map((d) => d.value),
+      data: incidentTimeTrends.timeToClose.map((d) => d.value),
+    },
+  ];
+
+  const demandChartSeries = [
+    {
+      name: 'Time to Own (Prise en Charge)',
+      data: demandTimeTrends.timeToOwn.map((d) => d.value),
+    },
+    {
+      name: 'Time to Close (Clôture)',
+      data: demandTimeTrends.timeToClose.map((d) => d.value),
     },
   ];
 
@@ -522,6 +539,9 @@ const GlpiDashboard: React.FC = () => {
                   <div className="h-full rounded-full transition-all duration-700 ease-out"
                        style={{ width: `${Math.min(kpiSummary.resolutionRate, 100)}%`, backgroundColor: accent }} />
                 </div>
+                <p className="text-[12px] text-slate-400 mt-2">
+                  Calcul : {kpiSummary.ticketsClosed} tickets clos ÷ {kpiSummary.ticketsCreated} tickets créés × 100
+                </p>
               </div>
             );
           })()}
@@ -547,6 +567,9 @@ const GlpiDashboard: React.FC = () => {
                     ? 'Prise en charge en ~0,5 journée ouvrée'
                     : 'Délai moyen de prise en charge'}
                 </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Calcul : moyenne (date de prise en charge − date de création)
+                </p>
               </div>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-amber-100 bg-amber-50/60 shrink-0 ml-4">
                 <Clock className="w-6 h-6 text-[#F59E0B]" />
@@ -571,6 +594,9 @@ const GlpiDashboard: React.FC = () => {
                   {selectedMonth === '2026-04' && ticketType === undefined
                     ? 'Valeur la plus élevée sur la période affichée'
                     : 'Délai moyen de clôture des tickets'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Calcul : moyenne (date de résolution − date de création)
                 </p>
               </div>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-pink-100 bg-pink-50/60 shrink-0 ml-4">
@@ -600,27 +626,32 @@ const GlpiDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Charts Grid */}
+      {/* Ticket Volume Chart - Full Width */}
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+        <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Volumétrie des Tickets par Mois</h3>
+        <p className="text-[13px] text-[#94A3B8] mb-4">Volume mensuel de création de tickets</p>
+        <div className="h-72">
+          <Chart options={volumeChartOptions} series={volumeChartSeries} type="bar" height="100%" />
+        </div>
+      </div>
+
+      {/* Time Trends Grid - Two Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Ticket Volume Chart */}
-        <div
-          className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm"
-        >
-          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Volumétrie des Tickets par Mois</h3>
-          <p className="text-[13px] text-[#94A3B8] mb-4">Volume mensuel de création de tickets</p>
+        {/* Time Trends Chart - Incidents */}
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Incidents</h3>
+          <p className="text-[13px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
           <div className="h-72">
-            <Chart options={volumeChartOptions} series={volumeChartSeries} type="bar" height="100%" />
+            <Chart options={createTimeChartOptions(incidentTimeTrends)} series={incidentChartSeries} type="area" height="100%" />
           </div>
         </div>
 
-        {/* Time Trends Chart */}
-        <div
-          className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm"
-        >
-          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens</h3>
+        {/* Time Trends Chart - Demandes */}
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Demandes</h3>
           <p className="text-[13px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
           <div className="h-72">
-            <Chart options={timeChartOptions} series={timeChartSeries} type="area" height="100%" />
+            <Chart options={createTimeChartOptions(demandTimeTrends)} series={demandChartSeries} type="area" height="100%" />
           </div>
         </div>
       </div>
@@ -661,10 +692,16 @@ const GlpiDashboard: React.FC = () => {
                   <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
                     volComp.isDecrease ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-red-50 text-[#DC2626] border border-red-100'
                   }`}>
-                    {volComp.isDecrease ? '✓' : '⚠'} {volComp.isDecrease 
-                      ? `Réduction de ~${volComp.pctChange}% vs ${volComp.prevMonthName}` 
+                    {volComp.isDecrease ? '✓' : '⚠'} {volComp.isDecrease
+                      ? `Réduction de ~${volComp.pctChange}% vs ${volComp.prevMonthName}`
                       : `Hausse de ~${Math.abs(volComp.pctChange)}% vs ${volComp.prevMonthName}`}
                   </div>
+                )}
+
+                {volComp && (
+                  <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                    KPI : ({volComp.prevTickets} − {volComp.currentTickets}) ÷ {volComp.prevTickets} × 100 ≈ {volComp.pctChange}%
+                  </p>
                 )}
                 
                 <p className="text-[12px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
@@ -698,10 +735,16 @@ const GlpiDashboard: React.FC = () => {
                   <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
                     ownComp.isImprovement ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-amber-50 text-[#D97706] border border-amber-100'
                   }`}>
-                    {ownComp.isImprovement ? '✓' : '⚠'} {ownComp.isImprovement 
-                      ? `Prise en charge accélérée : -${ownComp.pctChange}% vs ${ownComp.prevMonthName}` 
+                    {ownComp.isImprovement ? '✓' : '⚠'} {ownComp.isImprovement
+                      ? `Prise en charge accélérée : -${ownComp.pctChange}% vs ${ownComp.prevMonthName}`
                       : `Temps de réaction allongé : +${Math.abs(ownComp.pctChange)}% vs ${ownComp.prevMonthName}`}
                   </div>
+                )}
+
+                {ownComp && (
+                  <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                    KPI : ({ownComp.prevOwn} − {ownComp.currentOwn}) ÷ {ownComp.prevOwn} × 100 ≈ {ownComp.pctChange}%
+                  </p>
                 )}
 
                 <p className="text-[12px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
@@ -729,6 +772,10 @@ const GlpiDashboard: React.FC = () => {
                 </p>
                 <p>
                   Écart moyen entre prise en charge et clôture : <strong className="text-[#0F172A]">{(kpiSummary.timeToClose - kpiSummary.timeToOwn).toFixed(1)} heures</strong>.
+                </p>
+
+                <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                  KPI : {kpiSummary.timeToClose.toFixed(1)} h − {kpiSummary.timeToOwn.toFixed(1)} h = {(kpiSummary.timeToClose - kpiSummary.timeToOwn).toFixed(1)} h
                 </p>
 
                 {closeComp && (

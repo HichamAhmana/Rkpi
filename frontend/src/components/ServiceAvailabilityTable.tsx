@@ -160,7 +160,12 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      return { key: `${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
+      if (activePreset === 30) {
+        return { key: `${itemid}-preset-30`, from: undefined, to: undefined };
+      }
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - activePreset * 24 * 60 * 60;
+      return { key: `${itemid}-preset-${activePreset}`, from, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
@@ -196,10 +201,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
       })
       .catch(err => {
         console.error("Failed to load history for panel", err);
-        if (isMounted) {
-          setError(true);
-          setLoading(false);
-        }
+        setError(true);
+        setLoading(false);
       });
 
     return () => { isMounted = false; };
@@ -287,8 +290,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
     },
     dataLabels: { enabled: false },
     grid: {
-      borderColor: SURFACE.border,
-      strokeDashArray: 4,
+      borderColor: SURFACE.borderLight,
+      strokeDashArray: 0,
       xaxis: { lines: { show: false } },
       yaxis: { lines: { show: true } },
     },
@@ -337,6 +340,19 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
   const periodLabel = activePreset ? `Last ${activePreset} days` : (selectedYear && selectedMonth ? `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}` : 'Custom range');
   const parsedName = parseServiceName(service.service_name);
 
+  let interpretationText = '';
+  let interpretationIcon = '✅';
+  if (status === 'running') {
+    interpretationText = 'Service running continuously with no incidents detected in the last 30 days.';
+    interpretationIcon = '✅';
+  } else if (status === 'anomaly') {
+    interpretationText = `${service.incident_days} incident day(s) detected in the last 30 days${service.last_incident ? `, most recently on ${formatLastIncident(service.last_incident)}` : ''}. Service is currently running.`;
+    interpretationIcon = '⚡';
+  } else {
+    interpretationText = `Service is currently stopped${service.last_incident ? ` — last incident on ${formatLastIncident(service.last_incident)}` : ''}. Immediate attention recommended.`;
+    interpretationIcon = '⚠️';
+  }
+
   return (
     <div className="bg-[#FAFBFD] border-t border-[var(--color-border)] p-6 flex flex-col lg:flex-row gap-8 transition-all duration-300">
       <div className="w-full lg:w-[28%] flex flex-col justify-between">
@@ -364,6 +380,9 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
               <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Incidents (30d)</span>
               <span className={`text-[14px] font-bold ${service.incident_days === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
                 {service.incident_days}
+              </span>
+              <span className="text-[10px] text-slate-400 mt-0.5">
+                = days with ≥ 1 non-running state in the last 30 days
               </span>
             </div>
 
@@ -464,6 +483,12 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
           ) : (
             <Chart options={chartOptions} series={series} type="area" width="100%" height="100%" />
           )}
+        </div>
+
+        {/* Interpretation */}
+        <div className="mt-4 flex items-start gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+          <span className="text-[14px] leading-none mt-px">{interpretationIcon}</span>
+          <p className="text-[12px] text-slate-500 leading-relaxed">{interpretationText}</p>
         </div>
       </div>
     </div>

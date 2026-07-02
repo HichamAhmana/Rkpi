@@ -98,7 +98,12 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
 
   const currentSelectionParams = useMemo(() => {
     if (activePreset !== null) {
-      return { key: `sfp-${itemid}-preset-${activePreset}`, from: undefined, to: undefined };
+      if (activePreset === 30) {
+        return { key: `sfp-${itemid}-preset-30`, from: undefined, to: undefined };
+      }
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - activePreset * 24 * 60 * 60;
+      return { key: `sfp-${itemid}-preset-${activePreset}`, from, to: undefined };
     } else if (selectedYear && selectedMonth) {
       const from = Math.floor(new Date(selectedYear, selectedMonth - 1, 1).getTime() / 1000);
       const to = Math.floor(new Date(selectedYear, selectedMonth, 1).getTime() / 1000) - 1;
