@@ -519,7 +519,7 @@ export class ZabbixService {
         -- Current status
         (SELECT hu.value FROM history_uint hu
          WHERE hu.itemid = i.itemid
-         ORDER BY hu.clock DESC LIMIT 1) as last_value,
+         ORDER BY hu.clock DESC LIMIT 1) as \`last_value\`,
         -- Min over 30 days
         (SELECT MIN(hu.value) FROM history_uint hu
          WHERE hu.itemid = i.itemid
@@ -571,7 +571,7 @@ export class ZabbixService {
         (SELECT hu2.value FROM history_uint hu2
          WHERE hu2.itemid = ?
          AND DATE(FROM_UNIXTIME(hu2.clock)) = DATE(FROM_UNIXTIME(clock))
-         ORDER BY hu2.clock DESC LIMIT 1) as last_value
+         ORDER BY hu2.clock DESC LIMIT 1) as \`last_value\`
       FROM history_uint
       WHERE itemid = ?
         AND clock >= ?
