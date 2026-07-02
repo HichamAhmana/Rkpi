@@ -197,7 +197,7 @@ export class ZabbixService {
 
   async getServiceAvailability(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.name as service_name,
         i.itemid,
@@ -237,7 +237,7 @@ export class ZabbixService {
 
   async getAgentAvailability(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         -- Current availability (1=available, 2=unavailable, 0=unknown)
         (SELECT hu.value FROM history_uint hu
@@ -263,7 +263,7 @@ export class ZabbixService {
 
   async getAgentAvailabilityStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.itemid,
         -- Current status
@@ -359,7 +359,7 @@ export class ZabbixService {
 
   async getUptimeStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.itemid,
         -- Current uptime in seconds (latest value)
@@ -512,7 +512,7 @@ export class ZabbixService {
 
   async getSfpPortsStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         i.name as port_name,
         i.itemid,
         CAST(REGEXP_REPLACE(i.key_, 'ifOperStatus\\.', '') AS UNSIGNED) as port_number,
@@ -609,7 +609,7 @@ export class ZabbixService {
 
   async getSwitchUptimeStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as switch_name,
         h.hostid,
         i.itemid,
