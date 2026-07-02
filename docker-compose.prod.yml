@@ -1,0 +1,26 @@
+# Production deployment: builds and runs the backend + frontend as two containers.
+# The frontend (nginx) is the only public entrypoint; it proxies /zabbix, /glpi,
+# /report and /auth to the backend over the internal compose network.
+#
+# backend/.env must point at the real Zabbix/GLPI databases (not the local
+# dev mirrors in docker-compose.yml) and set CORS_ORIGIN to this app's public URL.
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rkpi_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rkpi_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
