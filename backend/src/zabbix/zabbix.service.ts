@@ -201,9 +201,9 @@ export class ZabbixService implements OnModuleInit {
 
   async getServiceAvailability(): Promise<unknown[]> {
     // Resolve IDs first, then query history with a plain itemid IN list —
-    // folding the key-LIKE lookup into the big query changes its plan and
+    // folding the item lookup into the big query changes its plan and
     // re-triggers the live-execution timeouts.
-    const ids = await this.itemIdsByKeyPrefix('service.info[');
+    const ids = (await this.monitoredServiceItems()).map((r) => r.itemid);
     if (!ids.length) return [];
     return this.zabbixDataSource.query(
       `
@@ -257,18 +257,48 @@ export class ZabbixService implements OnModuleInit {
     return rows.map((r) => Number(r.itemid));
   }
 
-  private async itemIdsByKeyPrefix(prefix: string): Promise<number[]> {
+  // Zabbix's service discovery creates a service.info item for EVERY
+  // Windows service on a host (200+ across the two servers) — showing
+  // them all would flood the dashboard and the report, and the history
+  // query times out with that many items. The dashboard therefore shows
+  // this curated set. To monitor another service, add its { host, key }
+  // pair here; items are still resolved at runtime, so hosts being
+  // re-created in Zabbix can't break it.
+  private static readonly MONITORED_SERVICES: {
+    host: string;
+    key: string;
+  }[] = [
+    { host: 'DC-SRV', key: 'service.info["DNS",state]' },
+    { host: 'DC-SRV', key: 'service.info["Kdc",state]' },
+    { host: 'DC-SRV', key: 'service.info["Netlogon",state]' },
+    { host: 'DC-SRV', key: 'service.info["NTDS",state]' },
+    { host: 'DC-SRV', key: 'service.info["vmms",state]' },
+    { host: 'SAGE-SRV', key: 'service.info["MSSQL$SAGE100",state]' },
+    { host: 'SAGE-SRV', key: 'service.info["Netlogon",state]' },
+    { host: 'SAGE-SRV', key: 'service.info["SQLAgent$SAGE100",state]' },
+  ];
+
+  private async monitoredServiceItems(): Promise<
+    { itemid: number; host: string; key_: string }[]
+  > {
+    const pairs = ZabbixService.MONITORED_SERVICES;
+    const placeholders = pairs.map(() => '(?, ?)').join(', ');
+    const params = pairs.flatMap((p) => [p.host, p.key]);
     const rows: any[] = await this.zabbixDataSource.query(
-      `SELECT i.itemid
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, h.name as host, i.key_
        FROM items i
        JOIN hosts h ON h.hostid = i.hostid
-       WHERE i.key_ LIKE ?
+       WHERE (h.name, i.key_) IN (${placeholders})
          AND h.status = 0
          AND i.status = 0
-       ORDER BY h.name`,
-      [prefix + '%'],
+       ORDER BY h.name, i.key_`,
+      params,
     );
-    return rows.map((r) => Number(r.itemid));
+    return rows.map((r) => ({
+      itemid: Number(r.itemid),
+      host: String(r.host),
+      key_: String(r.key_),
+    }));
   }
 
   async getAgentAvailability(): Promise<unknown[]> {
@@ -921,20 +951,14 @@ export class ZabbixService implements OnModuleInit {
       vmms: 'vmms (Hyper-V)',
     };
 
-    const serviceRows: any[] = await this.zabbixDataSource.query(
-      `SELECT i.itemid, h.name as host, i.key_
-       FROM items i JOIN hosts h ON h.hostid = i.hostid
-       WHERE i.key_ LIKE 'service.info[%'
-         AND h.status = 0 AND i.status = 0
-       ORDER BY h.name, i.key_`,
-    );
-    const SERVICE_DEFS = serviceRows.map((r: any) => {
-      const m = /service\.info\["?([^",\]]+)"?/.exec(String(r.key_));
-      const svc = m ? m[1] : String(r.key_);
+    const serviceRows = await this.monitoredServiceItems();
+    const SERVICE_DEFS = serviceRows.map((r) => {
+      const m = /service\.info\["?([^",\]]+)"?/.exec(r.key_);
+      const svc = m ? m[1] : r.key_;
       return {
-        itemid: Number(r.itemid),
-        label: `${String(r.host)} – État du service ${SERVICE_ANNOTATIONS[svc] ?? svc}`,
-        host: String(r.host),
+        itemid: r.itemid,
+        label: `${r.host} – État du service ${SERVICE_ANNOTATIONS[svc] ?? svc}`,
+        host: r.host,
         type: 'service',
         service: svc,
       };
