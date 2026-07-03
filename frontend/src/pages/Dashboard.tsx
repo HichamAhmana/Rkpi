@@ -108,7 +108,11 @@ const Dashboard: React.FC = () => {
     fetchPanel(getServiceAvailability, setServiceData, 'service-availability');
     fetchPanel(getAgentAvailabilityStats, setAgentData, 'agent-availability-stats');
     fetchPanel(getUptimeStats, setUptimeData, 'uptime-stats');
+
+    setSfpLoading(true);
     fetchPanel(getSfpPortsStats, setSfpData, 'sfp-ports-stats', () => setSfpLoading(false));
+
+    setSwitchLoading(true);
     fetchPanel(getSwitchUptimeStats, setSwitchData, 'switch-uptime-stats', () => setSwitchLoading(false));
   }, [fetchCritical, fetchPanel]);
 
