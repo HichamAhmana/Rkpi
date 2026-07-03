@@ -29,8 +29,12 @@ export class ZabbixService implements OnModuleInit {
 
   @Cron('*/2 * * * *')
   async refreshSfpPortsCache(): Promise<void> {
+    const start = Date.now();
     try {
       this.sfpPortsCache = await this.computeSfpPortsStats();
+      this.logger.log(
+        `SFP ports cache refreshed: ${this.sfpPortsCache.length} rows in ${Date.now() - start}ms`,
+      );
     } catch (err) {
       this.logger.error('Failed to refresh SFP ports cache', err);
     }
@@ -38,11 +42,34 @@ export class ZabbixService implements OnModuleInit {
 
   @Cron('*/2 * * * *')
   async refreshSwitchUptimeCache(): Promise<void> {
+    const start = Date.now();
     try {
       this.switchUptimeCache = await this.computeSwitchUptimeStats();
+      this.logger.log(
+        `Switch uptime cache refreshed: ${this.switchUptimeCache.length} rows in ${Date.now() - start}ms`,
+      );
     } catch (err) {
       this.logger.error('Failed to refresh switch uptime cache', err);
     }
+  }
+
+  // The latest reading for one item — a single descending index seek on
+  // (itemid, clock). This is the only primitive the cached stats below are
+  // allowed to use against history_uint besides plain 30-day range
+  // aggregates: monolithic queries combining many correlated subqueries
+  // reliably exceeded 20s when run through the app despite being fast when
+  // run manually, so everything is decomposed into these trivial lookups.
+  private async latestHistoryUint(
+    itemid: number,
+  ): Promise<{ value: number; clock: number } | null> {
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ value, clock
+       FROM history_uint WHERE itemid = ?
+       ORDER BY clock DESC LIMIT 1`,
+      [itemid],
+    );
+    if (!rows.length) return null;
+    return { value: Number(rows[0].value), clock: Number(rows[0].clock) };
   }
 
   async ping(): Promise<{ status: string }> {
@@ -488,41 +515,63 @@ export class ZabbixService implements OnModuleInit {
   }
 
   private async computeSfpPortsStats(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        i.name as port_name,
-        i.itemid,
-        CAST(REGEXP_REPLACE(i.key_, 'ifOperStatus\\.', '') AS UNSIGNED) as port_number,
-        -- Current status
-        (SELECT hu.value FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         ORDER BY hu.clock DESC LIMIT 1) as \`last_value\`,
-        -- Min over 30 days
-        (SELECT MIN(hu.value) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as min_value,
-        -- Avg over 30 days
-        (SELECT ROUND(AVG(hu.value), 4) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as avg_value,
-        -- Max over 30 days
-        (SELECT MAX(hu.value) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as max_value,
-        -- How many times it went down
-        (SELECT COUNT(*) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value = 2
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as down_count,
-        -- Last time it went down
-        (SELECT FROM_UNIXTIME(MAX(hu.clock)) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value = 2
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as last_down
-      FROM items i
-      WHERE i.itemid IN (68527, 68529, 68530)
-      ORDER BY port_number ASC
-    `);
+    const SFP_ITEM_IDS = [68527, 68529, 68530];
+
+    const items: any[] = await this.zabbixDataSource.query(
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ itemid, name, key_
+       FROM items WHERE itemid IN (?)`,
+      [SFP_ITEM_IDS],
+    );
+
+    const results: {
+      port_name: string;
+      itemid: number;
+      port_number: number;
+      last_value: number | null;
+      min_value: number | null;
+      avg_value: number | null;
+      max_value: number | null;
+      down_count: number;
+      last_down: string | null;
+    }[] = [];
+    for (const item of items) {
+      const latest = await this.latestHistoryUint(Number(item.itemid));
+
+      let agg: Record<string, unknown> | null = null;
+      if (latest) {
+        const from = latest.clock - 30 * 24 * 3600;
+        const rows: any[] = await this.zabbixDataSource.query(
+          `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+             MIN(value) as min_value,
+             MAX(value) as max_value,
+             ROUND(AVG(value), 4) as avg_value,
+             SUM(CASE WHEN value = 2 THEN 1 ELSE 0 END) as down_count,
+             MAX(CASE WHEN value = 2 THEN clock END) as last_down_clock
+           FROM history_uint
+           WHERE itemid = ? AND clock >= ?`,
+          [item.itemid, from],
+        );
+        agg = (rows[0] ?? null) as Record<string, unknown> | null;
+      }
+
+      results.push({
+        port_name: String(item.name),
+        itemid: Number(item.itemid),
+        port_number: Number(String(item.key_).replace('ifOperStatus.', '')),
+        last_value: latest ? latest.value : null,
+        min_value: agg?.min_value != null ? Number(agg.min_value) : null,
+        avg_value: agg?.avg_value != null ? Number(agg.avg_value) : null,
+        max_value: agg?.max_value != null ? Number(agg.max_value) : null,
+        down_count: agg?.down_count != null ? Number(agg.down_count) : 0,
+        last_down:
+          agg?.last_down_clock != null
+            ? new Date(Number(agg.last_down_clock) * 1000).toISOString()
+            : null,
+      });
+    }
+
+    results.sort((a, b) => a.port_number - b.port_number);
+    return results;
   }
   async getSfpPortHistory(
     itemid: string,
@@ -589,53 +638,98 @@ export class ZabbixService implements OnModuleInit {
   }
 
   private async computeSwitchUptimeStats(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        h.name as switch_name,
-        h.hostid,
-        i.itemid,
-        (SELECT hu.value FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         ORDER BY hu.clock DESC LIMIT 1) as current_uptime_seconds,
-        (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         ORDER BY hu.clock DESC LIMIT 1) as last_check,
-        (SELECT MIN(hu.value) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as min_uptime_seconds,
-        (SELECT COUNT(*) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value < 300
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as restart_count,
-        (SELECT FROM_UNIXTIME(hu.clock) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value < 300
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-         ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
-        port_stats.total_ports,
-        port_stats.up_ports,
-        port_stats.down_ports
-      FROM items i
-      JOIN hosts h ON h.hostid = i.hostid
-      LEFT JOIN (
-        SELECT
-          i2.hostid,
-          COUNT(*) as total_ports,
-          SUM(CASE WHEN (
-            SELECT hu.value FROM history_uint hu
-            WHERE hu.itemid = i2.itemid ORDER BY hu.clock DESC LIMIT 1
-          ) = 1 THEN 1 ELSE 0 END) as up_ports,
-          SUM(CASE WHEN (
-            SELECT hu.value FROM history_uint hu
-            WHERE hu.itemid = i2.itemid ORDER BY hu.clock DESC LIMIT 1
-          ) = 2 THEN 1 ELSE 0 END) as down_ports
-        FROM items i2
-        WHERE i2.key_ LIKE 'ifOperStatus.%'
-        GROUP BY i2.hostid
-      ) port_stats ON port_stats.hostid = h.hostid
-      WHERE i.itemid IN (64359, 68052, 67018, 67802, 68230, 67660)
-      ORDER BY h.name
-    `);
+    const UPTIME_ITEM_IDS = [64359, 68052, 67018, 67802, 68230, 67660];
+
+    const items: any[] = await this.zabbixDataSource.query(
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */
+         i.itemid, i.hostid, h.name as switch_name
+       FROM items i
+       JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.itemid IN (?)
+       ORDER BY h.name`,
+      [UPTIME_ITEM_IDS],
+    );
+
+    // Latest status of every physical port on these switches, counted per
+    // host — one indexed LIMIT-1 lookup per port instead of a correlated
+    // subquery per port inside a GROUP BY over all of history_uint.
+    const portCounts = new Map<
+      number,
+      { total: number; up: number; down: number }
+    >();
+    const hostids = [...new Set(items.map((r) => Number(r.hostid)))];
+    if (hostids.length) {
+      const portItems: any[] = await this.zabbixDataSource.query(
+        `SELECT /*+ MAX_EXECUTION_TIME(5000) */ itemid, hostid
+         FROM items
+         WHERE hostid IN (?) AND key_ LIKE 'ifOperStatus.%'`,
+        [hostids],
+      );
+      for (const p of portItems) {
+        const hostid = Number(p.hostid);
+        const entry = portCounts.get(hostid) ?? { total: 0, up: 0, down: 0 };
+        entry.total += 1;
+        const latest = await this.latestHistoryUint(Number(p.itemid));
+        if (latest?.value === 1) entry.up += 1;
+        else if (latest?.value === 2) entry.down += 1;
+        portCounts.set(hostid, entry);
+      }
+    }
+
+    const results: {
+      switch_name: string;
+      hostid: number;
+      itemid: number;
+      current_uptime_seconds: number | null;
+      last_check: string | null;
+      min_uptime_seconds: number | null;
+      restart_count: number;
+      last_restart_time: string | null;
+      total_ports: number;
+      up_ports: number;
+      down_ports: number;
+    }[] = [];
+    for (const item of items) {
+      const latest = await this.latestHistoryUint(Number(item.itemid));
+
+      let agg: Record<string, unknown> | null = null;
+      if (latest) {
+        const from = latest.clock - 30 * 24 * 3600;
+        const rows: any[] = await this.zabbixDataSource.query(
+          `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+             MIN(value) as min_uptime_seconds,
+             SUM(CASE WHEN value < 300 THEN 1 ELSE 0 END) as restart_count,
+             MIN(CASE WHEN value < 300 THEN clock END) as last_restart_clock
+           FROM history_uint
+           WHERE itemid = ? AND clock >= ?`,
+          [item.itemid, from],
+        );
+        agg = (rows[0] ?? null) as Record<string, unknown> | null;
+      }
+
+      const ports = portCounts.get(Number(item.hostid));
+      results.push({
+        switch_name: String(item.switch_name),
+        hostid: Number(item.hostid),
+        itemid: Number(item.itemid),
+        current_uptime_seconds: latest ? latest.value : null,
+        last_check: latest ? new Date(latest.clock * 1000).toISOString() : null,
+        min_uptime_seconds:
+          agg?.min_uptime_seconds != null
+            ? Number(agg.min_uptime_seconds)
+            : null,
+        restart_count:
+          agg?.restart_count != null ? Number(agg.restart_count) : 0,
+        last_restart_time:
+          agg?.last_restart_clock != null
+            ? new Date(Number(agg.last_restart_clock) * 1000).toISOString()
+            : null,
+        total_ports: ports?.total ?? 0,
+        up_ports: ports?.up ?? 0,
+        down_ports: ports?.down ?? 0,
+      });
+    }
+    return results;
   }
 
   async getSwitchUptimeHistory(
