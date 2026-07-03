@@ -30,7 +30,7 @@ const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
       database: process.env.DB_ZABBIX_NAME ?? 'zabbix',
       synchronize: false,
       autoLoadEntities: true,
-      extra: { connectionLimit: 5 },
+      extra: { connectionLimit: 10 },
     }),
     ...(glpiEnabled
       ? [
