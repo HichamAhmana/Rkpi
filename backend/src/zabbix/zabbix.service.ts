@@ -631,29 +631,27 @@ export class ZabbixService {
          AND hu.value < 300
          AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
          ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
-        (SELECT COUNT(DISTINCT i2.itemid) FROM items i2
-         WHERE i2.hostid = h.hostid
-         AND i2.key_ LIKE 'ifOperStatus.%'
-         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
-        ) as total_ports,
-        (SELECT SUM(CASE WHEN hu2.value = 1 THEN 1 ELSE 0 END)
-         FROM items i2
-         JOIN history_uint hu2 ON hu2.itemid = i2.itemid
-         WHERE i2.hostid = h.hostid
-         AND i2.key_ LIKE 'ifOperStatus.%'
-         AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
-         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
-        ) as up_ports,
-        (SELECT SUM(CASE WHEN hu2.value = 2 THEN 1 ELSE 0 END)
-         FROM items i2
-         JOIN history_uint hu2 ON hu2.itemid = i2.itemid
-         WHERE i2.hostid = h.hostid
-         AND i2.key_ LIKE 'ifOperStatus.%'
-         AND hu2.clock = (SELECT MAX(clock) FROM history_uint WHERE itemid = i2.itemid)
-         AND EXISTS (SELECT 1 FROM history_uint hu3 WHERE hu3.itemid = i2.itemid LIMIT 1)
-        ) as down_ports
+        port_stats.total_ports,
+        port_stats.up_ports,
+        port_stats.down_ports
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
+      LEFT JOIN (
+        SELECT
+          i2.hostid,
+          COUNT(*) as total_ports,
+          SUM(CASE WHEN (
+            SELECT hu.value FROM history_uint hu
+            WHERE hu.itemid = i2.itemid ORDER BY hu.clock DESC LIMIT 1
+          ) = 1 THEN 1 ELSE 0 END) as up_ports,
+          SUM(CASE WHEN (
+            SELECT hu.value FROM history_uint hu
+            WHERE hu.itemid = i2.itemid ORDER BY hu.clock DESC LIMIT 1
+          ) = 2 THEN 1 ELSE 0 END) as down_ports
+        FROM items i2
+        WHERE i2.key_ LIKE 'ifOperStatus.%'
+        GROUP BY i2.hostid
+      ) port_stats ON port_stats.hostid = h.hostid
       WHERE i.itemid IN (64359, 68052, 67018, 67802, 68230, 67660)
       ORDER BY h.name
     `);
