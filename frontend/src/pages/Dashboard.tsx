@@ -53,46 +53,17 @@ const Dashboard: React.FC = () => {
   const isMountedRef = useRef(true);
   const hasLoadedOnceRef = useRef(false);
 
-  const fetchData = useCallback(async () => {
+  // Critical KPI cards — fast, required for the page to render at all.
+  const fetchCritical = useCallback(async () => {
     try {
       if (!hasLoadedOnceRef.current) {
         setInitialLoading(true);
       }
-
-      const [hosts, triggers, problems, services, agents, uptimes, sfpPorts, switches] =
-        await Promise.allSettled([
-          getHostStats(),
-          getTriggerStats(),
-          // getEventsByDay(),
-          getProblemsByHost(),
-          getServiceAvailability(),
-          getAgentAvailabilityStats(),
-          getUptimeStats(),
-          getSfpPortsStats(),
-          getSwitchUptimeStats(),
-        ]);
-
-      [hosts, triggers, problems, services, agents, uptimes, sfpPorts, switches]
-        .filter((r) => r.status === 'rejected')
-        .forEach((r) => console.error('Dashboard panel failed to load:', (r as PromiseRejectedResult).reason));
-
+      const [hosts, triggers] = await Promise.all([getHostStats(), getTriggerStats()]);
       if (isMountedRef.current) {
-        // hostStats/triggerStats gate the whole page (see error state below) — everything
-        // else fails independently so one slow/broken panel doesn't block the rest.
-        if (hosts.status !== 'fulfilled' || triggers.status !== 'fulfilled') {
-          throw hosts.status === 'rejected' ? hosts.reason : (triggers as PromiseRejectedResult).reason;
-        }
-
-        setHostStats(hosts.value);
-        setTriggerStats(triggers.value);
-        setProblemsData(problems.status === 'fulfilled' ? problems.value : []);
-        setServiceData(services.status === 'fulfilled' ? services.value : []);
-        setAgentData(agents.status === 'fulfilled' ? agents.value : []);
-        setUptimeData(uptimes.status === 'fulfilled' ? uptimes.value : []);
-        setSfpData(sfpPorts.status === 'fulfilled' ? sfpPorts.value : []);
-        setSwitchData(switches.status === 'fulfilled' ? switches.value : []);
+        setHostStats(hosts);
+        setTriggerStats(triggers);
         setError(null);
-
         if (!hasLoadedOnceRef.current) {
           hasLoadedOnceRef.current = true;
           setInitialLoading(false);
@@ -100,7 +71,7 @@ const Dashboard: React.FC = () => {
       }
     } catch (err) {
       if (isMountedRef.current) {
-        console.error('Error fetching dashboard data:', err);
+        console.error('Error fetching critical dashboard data:', err);
         if (!hasLoadedOnceRef.current) {
           setError('Failed to load dashboard data. Please try again later.');
           setInitialLoading(false);
@@ -108,6 +79,28 @@ const Dashboard: React.FC = () => {
       }
     }
   }, []);
+
+  // Every other panel loads independently — a slow/failed one only affects
+  // its own section, never blocks or delays the rest of the page.
+  const fetchPanel = useCallback(<T,>(fetcher: () => Promise<T>, setter: (data: T) => void, label: string) => {
+    fetcher()
+      .then((data) => {
+        if (isMountedRef.current) setter(data);
+      })
+      .catch((err) => {
+        console.error(`Error fetching ${label}:`, err);
+      });
+  }, []);
+
+  const fetchData = useCallback(() => {
+    fetchCritical();
+    fetchPanel(getProblemsByHost, setProblemsData, 'problems-by-host');
+    fetchPanel(getServiceAvailability, setServiceData, 'service-availability');
+    fetchPanel(getAgentAvailabilityStats, setAgentData, 'agent-availability-stats');
+    fetchPanel(getUptimeStats, setUptimeData, 'uptime-stats');
+    fetchPanel(getSfpPortsStats, setSfpData, 'sfp-ports-stats');
+    fetchPanel(getSwitchUptimeStats, setSwitchData, 'switch-uptime-stats');
+  }, [fetchCritical, fetchPanel]);
 
   useEffect(() => {
     isMountedRef.current = true;
