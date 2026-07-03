@@ -481,7 +481,7 @@ export class ZabbixService {
          AND hu.value = 2
          AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)) as last_down
       FROM items i
-      WHERE i.itemid IN (64499, 64501, 64502)
+      WHERE i.itemid IN (68527, 68529, 68530)
       ORDER BY port_number ASC
     `);
   }
