@@ -17,7 +17,7 @@ export class ZabbixService {
 
   async getHosts(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT 
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.hostid,
         h.host,
         h.name,
@@ -35,7 +35,7 @@ export class ZabbixService {
 
   async getHostStats(): Promise<unknown> {
     const rows: unknown[] = await this.zabbixDataSource.query(`
-    SELECT
+    SELECT /*+ MAX_EXECUTION_TIME(20000) */
       COUNT(DISTINCT h.hostid) as total,
       SUM(CASE WHEN h.status = 0 AND i.available = 1 THEN 1 ELSE 0 END) as online,
       SUM(CASE WHEN h.status = 0 AND i.available = 2 THEN 1 ELSE 0 END) as offline,
@@ -52,7 +52,7 @@ export class ZabbixService {
 
   async getTriggerStats(): Promise<unknown> {
     const rows: unknown[] = await this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         COUNT(*) as total,
         SUM(CASE WHEN t.value = 1 AND t.status = 0 THEN 1 ELSE 0 END) as problem,
         SUM(CASE WHEN t.value = 0 AND t.status = 0 THEN 1 ELSE 0 END) as ok,
@@ -74,7 +74,7 @@ export class ZabbixService {
 
   async getRecentEvents(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         e.eventid,
         e.clock,
         e.name,
@@ -99,7 +99,7 @@ export class ZabbixService {
 
   async getEventsByDay(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         DATE(FROM_UNIXTIME(e.clock)) as day,
         COUNT(*) as total,
         SUM(CASE WHEN e.value = 1 THEN 1 ELSE 0 END) as problems,
@@ -120,7 +120,7 @@ export class ZabbixService {
 
   async getProblemsByHost(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host_name,
         COUNT(t.triggerid) as problem_count
       FROM triggers t
@@ -139,7 +139,7 @@ export class ZabbixService {
 
   async getCpuStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host_name,
         (
           SELECT value 
@@ -161,7 +161,7 @@ export class ZabbixService {
 
   async getCpuDetails(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT
+      SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host_name,
         (
           SELECT value 
