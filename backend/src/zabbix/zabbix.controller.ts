@@ -50,18 +50,6 @@ export class ZabbixController {
     return this.zabbixService.getProblemsByHost();
   }
 
-  @CacheTTL(1 * MIN)
-  @Get('cpu-stats')
-  getCpuStats() {
-    return this.zabbixService.getCpuStats();
-  }
-
-  @CacheTTL(1 * MIN)
-  @Get('cpu-details')
-  getCpuDetails() {
-    return this.zabbixService.getCpuDetails();
-  }
-
   @CacheTTL(2 * MIN)
   @Get('service-availability')
   getServiceAvailability() {

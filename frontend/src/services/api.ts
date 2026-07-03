@@ -69,19 +69,6 @@ export interface ProblemByHost {
   problem_count: number;
 }
 
-export interface CpuStat {
-  host_name: string;
-  cpu_utilization: string | number;
-}
-
-export interface CpuDetail {
-  host_name: string;
-  cpu_utilization: number | string | null;
-  cpu_load: number | string | null;
-  cpu_temperature: number | string | null;
-  cpu_cores: number | string | null;
-}
-
 // ─── New Interfaces ────────────────────────────────────────────────
 
 export interface ServiceItem {
@@ -172,16 +159,6 @@ export const getEventsByDay = async (): Promise<EventByDay[]> => {
 
 export const getProblemsByHost = async (): Promise<ProblemByHost[]> => {
   const { data } = await api.get<ProblemByHost[]>('/problems-by-host');
-  return data;
-};
-
-export const getCpuStats = async (): Promise<CpuStat[]> => {
-  const { data } = await api.get<CpuStat[]>('/cpu-stats');
-  return data;
-};
-
-export const getCpuDetails = async (): Promise<CpuDetail[]> => {
-  const { data } = await api.get<CpuDetail[]>('/cpu-details');
   return data;
 };
 

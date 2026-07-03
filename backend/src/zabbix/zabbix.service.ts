@@ -137,64 +137,6 @@ export class ZabbixService {
     `);
   }
 
-  async getCpuStats(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        h.name as host_name,
-        (
-          SELECT value 
-          FROM history 
-          WHERE itemid = i.itemid 
-          ORDER BY clock DESC 
-          LIMIT 1
-        ) as cpu_utilization
-      FROM items i
-      JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.key_ LIKE 'system.cpu.util%'
-        AND h.status = 0
-        AND h.templateid IS NULL
-      HAVING cpu_utilization IS NOT NULL
-      ORDER BY cpu_utilization DESC
-      LIMIT 10
-    `);
-  }
-
-  async getCpuDetails(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        h.name as host_name,
-        (
-          SELECT value 
-          FROM history 
-          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.util%' LIMIT 1) 
-          ORDER BY clock DESC LIMIT 1
-        ) as cpu_utilization,
-        (
-          SELECT value 
-          FROM history 
-          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.load%' LIMIT 1) 
-          ORDER BY clock DESC LIMIT 1
-        ) as cpu_load,
-        (
-          SELECT value 
-          FROM history 
-          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE '%temp%' AND name LIKE '%CPU%' LIMIT 1) 
-          ORDER BY clock DESC LIMIT 1
-        ) as cpu_temperature,
-        (
-          SELECT value 
-          FROM history_uint 
-          WHERE itemid = (SELECT itemid FROM items WHERE hostid = h.hostid AND key_ LIKE 'system.cpu.num%' LIMIT 1) 
-          ORDER BY clock DESC LIMIT 1
-        ) as cpu_cores
-      FROM hosts h
-      WHERE h.status = 0
-        AND h.templateid IS NULL
-      HAVING cpu_utilization IS NOT NULL OR cpu_cores IS NOT NULL OR cpu_temperature IS NOT NULL
-      ORDER BY h.name ASC
-    `);
-  }
-
   async getServiceAvailability(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
       SELECT /*+ MAX_EXECUTION_TIME(20000) */

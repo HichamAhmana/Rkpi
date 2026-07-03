@@ -5,8 +5,6 @@ import KPICard from '../components/KPICard';
 import ProblemsByHostChart from '../components/charts/ProblemsByHostChart';
 import HostAvailabilityChart from '../components/charts/HostAvailabilityChart';
 import TriggerSeverityChart from '../components/charts/TriggerSeverityChart';
-import CpuUsageChart from '../components/charts/CpuUsageChart';
-import CpuDetailsTable from '../components/CpuDetailsTable';
 import ServiceAvailabilityTable from '../components/ServiceAvailabilityTable';
 import AgentAvailabilitySection from '../components/AgentAvailabilitySection';
 import UptimeSection from '../components/UptimeSection';
@@ -18,8 +16,6 @@ import {
   getTriggerStats,
   // getEventsByDay,
   getProblemsByHost,
-  getCpuStats,
-  getCpuDetails,
   getServiceAvailability,
   getAgentAvailabilityStats,
   getUptimeStats,
@@ -31,8 +27,6 @@ import type {
   TriggerStats,
   // EventByDay,
   ProblemByHost,
-  CpuStat,
-  CpuDetail,
   ServerServices,
   AgentStat,
   UptimeStat,
@@ -50,8 +44,6 @@ const Dashboard: React.FC = () => {
   const [triggerStats, setTriggerStats] = useState<TriggerStats | null>(null);
   // const [eventsData, setEventsData] = useState<EventByDay[]>([]);
   const [problemsData, setProblemsData] = useState<ProblemByHost[]>([]);
-  const [cpuData, setCpuData] = useState<CpuStat[]>([]);
-  const [cpuDetailsData, setCpuDetailsData] = useState<CpuDetail[]>([]);
   const [serviceData, setServiceData] = useState<ServerServices[]>([]);
   const [agentData, setAgentData] = useState<AgentStat[]>([]);
   const [uptimeData, setUptimeData] = useState<UptimeStat[]>([]);
@@ -67,14 +59,12 @@ const Dashboard: React.FC = () => {
         setInitialLoading(true);
       }
 
-      const [hosts, triggers, problems, cpus, cpuDetails, services, agents, uptimes, sfpPorts, switches] =
+      const [hosts, triggers, problems, services, agents, uptimes, sfpPorts, switches] =
         await Promise.all([
           getHostStats(),
           getTriggerStats(),
           // getEventsByDay(),
           getProblemsByHost(),
-          getCpuStats(),
-          getCpuDetails(),
           getServiceAvailability(),
           getAgentAvailabilityStats(),
           getUptimeStats(),
@@ -87,8 +77,6 @@ const Dashboard: React.FC = () => {
         setTriggerStats(triggers);
         // setEventsData(events);
         setProblemsData(problems);
-        setCpuData(cpus);
-        setCpuDetailsData(cpuDetails);
         setServiceData(services);
         setAgentData(agents);
         setUptimeData(uptimes);
@@ -224,17 +212,11 @@ const Dashboard: React.FC = () => {
           <TriggerSeverityChart data={triggerStats} />
         </div>
         
-        {/* Row 2: Problems by Host (1/3) & CPU Usage (2/3) */}
-        <div>
+        {/* Row 2: Problems by Host */}
+        <div className="lg:col-span-3">
           <ProblemsByHostChart data={problemsData} />
         </div>
-        <div className="lg:col-span-2">
-          <CpuUsageChart data={cpuData} />
-        </div>
       </div>
-
-      {/* CPU Details Table */}
-      <CpuDetailsTable data={cpuDetailsData} />
     </div>
   );
 };
