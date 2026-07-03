@@ -200,7 +200,13 @@ export class ZabbixService implements OnModuleInit {
   }
 
   async getServiceAvailability(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
+    // Resolve IDs first, then query history with a plain itemid IN list —
+    // folding the key-LIKE lookup into the big query changes its plan and
+    // re-triggers the live-execution timeouts.
+    const ids = await this.itemIdsByKeyPrefix('service.info[');
+    if (!ids.length) return [];
+    return this.zabbixDataSource.query(
+      `
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.name as service_name,
@@ -225,11 +231,11 @@ export class ZabbixService implements OnModuleInit {
         ) as last_incident
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.key_ LIKE 'service.info[%'
-        AND h.status = 0
-        AND i.status = 0
+      WHERE i.itemid IN (?)
       ORDER BY h.name, i.name
-    `);
+    `,
+      [ids],
+    );
   }
 
   // Items are always resolved by host + key, never by item ID: Zabbix
@@ -247,6 +253,20 @@ export class ZabbixService implements OnModuleInit {
          AND i.status = 0
        ORDER BY h.name`,
       [key],
+    );
+    return rows.map((r) => Number(r.itemid));
+  }
+
+  private async itemIdsByKeyPrefix(prefix: string): Promise<number[]> {
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid
+       FROM items i
+       JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ LIKE ?
+         AND h.status = 0
+         AND i.status = 0
+       ORDER BY h.name`,
+      [prefix + '%'],
     );
     return rows.map((r) => Number(r.itemid));
   }
