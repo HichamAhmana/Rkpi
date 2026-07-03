@@ -45,10 +45,14 @@ const TriggerSeverityChart: React.FC<TriggerSeverityChartProps> = ({ data }) => 
     tooltip: { theme: 'light' },
   };
 
+  // MySQL SUM() comes back as a string over JSON — coerce so ApexCharts
+  // doesn't silently render an empty chart.
   const series = [
     {
       name: 'Triggers',
-      data: [data.disaster, data.high, data.average, data.warning, data.info],
+      data: [data.disaster, data.high, data.average, data.warning, data.info].map(
+        (v) => Number(v ?? 0),
+      ),
     },
   ];
 

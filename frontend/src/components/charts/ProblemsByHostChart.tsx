@@ -51,7 +51,7 @@ const ProblemsByHostChart: React.FC<ProblemsByHostChartProps> = ({ data }) => {
   const series = [
     {
       name: 'Problems',
-      data: data.map(d => d.problem_count),
+      data: data.map((d) => Number(d.problem_count ?? 0)),
     },
   ];
 

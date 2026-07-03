@@ -56,7 +56,11 @@ const HostAvailabilityChart: React.FC<HostAvailabilityChartProps> = ({ data }) =
     tooltip: { theme: 'light' },
   };
 
-  const series = [data.online, data.offline, data.unknown, data.disabled];
+  // MySQL SUM() comes back as a string over JSON — ApexCharts silently
+  // renders an empty donut (Total 0) unless the values are real numbers.
+  const series = [data.online, data.offline, data.unknown, data.disabled].map(
+    (v) => Number(v ?? 0),
+  );
 
   return (
     <div
