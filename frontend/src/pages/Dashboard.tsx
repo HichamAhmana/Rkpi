@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
       }
 
       const [hosts, triggers, problems, services, agents, uptimes, sfpPorts, switches] =
-        await Promise.all([
+        await Promise.allSettled([
           getHostStats(),
           getTriggerStats(),
           // getEventsByDay(),
@@ -72,16 +72,25 @@ const Dashboard: React.FC = () => {
           getSwitchUptimeStats(),
         ]);
 
+      [hosts, triggers, problems, services, agents, uptimes, sfpPorts, switches]
+        .filter((r) => r.status === 'rejected')
+        .forEach((r) => console.error('Dashboard panel failed to load:', (r as PromiseRejectedResult).reason));
+
       if (isMountedRef.current) {
-        setHostStats(hosts);
-        setTriggerStats(triggers);
-        // setEventsData(events);
-        setProblemsData(problems);
-        setServiceData(services);
-        setAgentData(agents);
-        setUptimeData(uptimes);
-        setSfpData(sfpPorts);
-        setSwitchData(switches);
+        // hostStats/triggerStats gate the whole page (see error state below) — everything
+        // else fails independently so one slow/broken panel doesn't block the rest.
+        if (hosts.status !== 'fulfilled' || triggers.status !== 'fulfilled') {
+          throw hosts.status === 'rejected' ? hosts.reason : (triggers as PromiseRejectedResult).reason;
+        }
+
+        setHostStats(hosts.value);
+        setTriggerStats(triggers.value);
+        setProblemsData(problems.status === 'fulfilled' ? problems.value : []);
+        setServiceData(services.status === 'fulfilled' ? services.value : []);
+        setAgentData(agents.status === 'fulfilled' ? agents.value : []);
+        setUptimeData(uptimes.status === 'fulfilled' ? uptimes.value : []);
+        setSfpData(sfpPorts.status === 'fulfilled' ? sfpPorts.value : []);
+        setSwitchData(switches.status === 'fulfilled' ? switches.value : []);
         setError(null);
 
         if (!hasLoadedOnceRef.current) {
