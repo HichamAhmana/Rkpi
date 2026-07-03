@@ -1,14 +1,49 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 
 @Injectable()
-export class ZabbixService {
+export class ZabbixService implements OnModuleInit {
+  private readonly logger = new Logger(ZabbixService.name);
+
+  // sfp-ports-stats and switch-uptime-stats are computed on a schedule
+  // instead of per-request — both have been observed taking 20s+ (their
+  // MAX_EXECUTION_TIME cap) when run live, despite completing in well
+  // under a second when run directly against the database. Serving a
+  // cached result keeps the API fast and reliable regardless of that
+  // unresolved discrepancy.
+  private sfpPortsCache: unknown[] = [];
+  private switchUptimeCache: unknown[] = [];
+
   constructor(
     @InjectDataSource('zabbix')
     private zabbixDataSource: DataSource,
   ) {}
+
+  onModuleInit(): void {
+    void this.refreshSfpPortsCache();
+    void this.refreshSwitchUptimeCache();
+  }
+
+  @Cron('*/2 * * * *')
+  async refreshSfpPortsCache(): Promise<void> {
+    try {
+      this.sfpPortsCache = await this.computeSfpPortsStats();
+    } catch (err) {
+      this.logger.error('Failed to refresh SFP ports cache', err);
+    }
+  }
+
+  @Cron('*/2 * * * *')
+  async refreshSwitchUptimeCache(): Promise<void> {
+    try {
+      this.switchUptimeCache = await this.computeSwitchUptimeStats();
+    } catch (err) {
+      this.logger.error('Failed to refresh switch uptime cache', err);
+    }
+  }
 
   async ping(): Promise<{ status: string }> {
     await this.zabbixDataSource.query('SELECT 1');
@@ -448,7 +483,11 @@ export class ZabbixService {
 
   // ─── SW-1 SFP Ports ───────────────────────────────────────────────
 
-  async getSfpPortsStats(): Promise<unknown[]> {
+  getSfpPortsStats(): unknown[] {
+    return this.sfpPortsCache;
+  }
+
+  private async computeSfpPortsStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         i.name as port_name,
@@ -545,7 +584,11 @@ export class ZabbixService {
 
   // ─── Network Switches ─────────────────────────────────────────────
 
-  async getSwitchUptimeStats(): Promise<unknown[]> {
+  getSwitchUptimeStats(): unknown[] {
+    return this.switchUptimeCache;
+  }
+
+  private async computeSwitchUptimeStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as switch_name,
