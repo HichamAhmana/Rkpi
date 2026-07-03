@@ -661,14 +661,44 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
 
 interface SwitchUptimeSectionProps {
   data: SwitchUptimeStat[];
+  isLoading?: boolean;
 }
 
-const SwitchUptimeSection: React.FC<SwitchUptimeSectionProps> = ({ data }) => {
+const SwitchUptimeSection: React.FC<SwitchUptimeSectionProps> = ({ data, isLoading = false }) => {
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [availablePeriodsCache, setAvailablePeriodsCache] = useState<Record<number, AvailablePeriod[]>>({});
   const [customHistoryCache, setCustomHistoryCache] = useState<Record<string, SwitchUptimeHistoryPoint[]>>({});
 
-  if (!data || data.length === 0) return null;
+  if ((!data || data.length === 0) && !isLoading) return null;
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full">
+        <div className="mb-4">
+          <h3 className="text-[16px] font-semibold text-[#0F172A]">
+            Network Switches — Uptime &amp; Availability
+          </h3>
+          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+            All 6 switches monitored via SNMP
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-[#E2E8F0] p-5"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' }}
+            >
+              <div className="skeleton w-28 h-4 mb-3" />
+              <div className="skeleton w-16 h-7 mb-2" />
+              <div className="skeleton w-44 h-3 mb-3" />
+              <div className="skeleton w-full h-1.5 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

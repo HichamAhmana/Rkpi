@@ -49,6 +49,8 @@ const Dashboard: React.FC = () => {
   const [uptimeData, setUptimeData] = useState<UptimeStat[]>([]);
   const [sfpData, setSfpData] = useState<SfpPortStat[]>([]);
   const [switchData, setSwitchData] = useState<SwitchUptimeStat[]>([]);
+  const [sfpLoading, setSfpLoading] = useState(true);
+  const [switchLoading, setSwitchLoading] = useState(true);
 
   const isMountedRef = useRef(true);
   const hasLoadedOnceRef = useRef(false);
@@ -82,13 +84,21 @@ const Dashboard: React.FC = () => {
 
   // Every other panel loads independently — a slow/failed one only affects
   // its own section, never blocks or delays the rest of the page.
-  const fetchPanel = useCallback(<T,>(fetcher: () => Promise<T>, setter: (data: T) => void, label: string) => {
+  const fetchPanel = useCallback(<T,>(
+    fetcher: () => Promise<T>,
+    setter: (data: T) => void,
+    label: string,
+    onSettled?: () => void,
+  ) => {
     fetcher()
       .then((data) => {
         if (isMountedRef.current) setter(data);
       })
       .catch((err) => {
         console.error(`Error fetching ${label}:`, err);
+      })
+      .finally(() => {
+        if (isMountedRef.current) onSettled?.();
       });
   }, []);
 
@@ -98,8 +108,8 @@ const Dashboard: React.FC = () => {
     fetchPanel(getServiceAvailability, setServiceData, 'service-availability');
     fetchPanel(getAgentAvailabilityStats, setAgentData, 'agent-availability-stats');
     fetchPanel(getUptimeStats, setUptimeData, 'uptime-stats');
-    fetchPanel(getSfpPortsStats, setSfpData, 'sfp-ports-stats');
-    fetchPanel(getSwitchUptimeStats, setSwitchData, 'switch-uptime-stats');
+    fetchPanel(getSfpPortsStats, setSfpData, 'sfp-ports-stats', () => setSfpLoading(false));
+    fetchPanel(getSwitchUptimeStats, setSwitchData, 'switch-uptime-stats', () => setSwitchLoading(false));
   }, [fetchCritical, fetchPanel]);
 
   useEffect(() => {
@@ -196,10 +206,10 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* SW-1 SFP Uplink Ports */}
-      <SfpPortsSection data={sfpData} />
+      <SfpPortsSection data={sfpData} isLoading={sfpLoading} />
 
       {/* Network Switches — Uptime & Availability */}
-      <SwitchUptimeSection data={switchData} />
+      <SwitchUptimeSection data={switchData} isLoading={switchLoading} />
 
       {/* Service Availability */}
       <ServiceAvailabilityTable data={serviceData} />
