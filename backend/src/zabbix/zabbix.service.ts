@@ -547,7 +547,7 @@ export class ZabbixService {
 
   async getSwitchUptimeStats(): Promise<unknown[]> {
     return this.zabbixDataSource.query(`
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
+      SELECT /*+ MAX_EXECUTION_TIME(60000) */
         h.name as switch_name,
         h.hostid,
         i.itemid,
