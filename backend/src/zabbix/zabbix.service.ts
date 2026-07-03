@@ -225,22 +225,37 @@ export class ZabbixService implements OnModuleInit {
         ) as last_incident
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.itemid IN (
-        64317, -- MSSQL$SAGE100
-        64336, -- SQLAgent$SAGE100
-        62724, -- NTDS
-        62703, -- DNS
-        62713, -- Kdc
-        62721, -- Netlogon DC-SRV
-        64319, -- Netlogon SAGE-SRV
-        62753  -- vmms
-      )
+      WHERE i.key_ LIKE 'service.info[%'
+        AND h.status = 0
+        AND i.status = 0
       ORDER BY h.name, i.name
     `);
   }
 
+  // Items are always resolved by host + key, never by item ID: Zabbix
+  // assigns a fresh item ID whenever a host is deleted/re-created or
+  // re-discovered, which used to silently drop sections from the
+  // dashboard. Discovering by key also means a newly monitored server
+  // shows up without a code change.
+  private async itemIdsByKey(key: string): Promise<number[]> {
+    const rows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid
+       FROM items i
+       JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ = ?
+         AND h.status = 0
+         AND i.status = 0
+       ORDER BY h.name`,
+      [key],
+    );
+    return rows.map((r) => Number(r.itemid));
+  }
+
   async getAgentAvailability(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
+    const ids = await this.itemIdsByKey('zabbix[host,agent,available]');
+    if (!ids.length) return [];
+    return this.zabbixDataSource.query(
+      `
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         -- Current availability (1=available, 2=unavailable, 0=unknown)
@@ -257,16 +272,18 @@ export class ZabbixService implements OnModuleInit {
         ) as availability_pct
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.itemid IN (
-        62658, -- Zabbix agent availability DC-SRV
-        64209  -- Zabbix agent availability SAGE-SRV
-      )
+      WHERE i.itemid IN (?)
       ORDER BY h.name
-    `);
+    `,
+      [ids],
+    );
   }
 
   async getAgentAvailabilityStats(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
+    const ids = await this.itemIdsByKey('zabbix[host,agent,available]');
+    if (!ids.length) return [];
+    return this.zabbixDataSource.query(
+      `
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.itemid,
@@ -291,16 +308,18 @@ export class ZabbixService implements OnModuleInit {
         JOIN (
           SELECT itemid, MAX(clock) as max_clock
           FROM history_uint
-          WHERE itemid IN (62658, 64209)
+          WHERE itemid IN (?)
           GROUP BY itemid
         ) bounds ON bounds.itemid = hu.itemid
          AND hu.clock >= bounds.max_clock - (30 * 24 * 3600)
-        WHERE hu.itemid IN (62658, 64209)
+        WHERE hu.itemid IN (?)
         GROUP BY hu.itemid
       ) stats ON stats.itemid = i.itemid
-      WHERE i.itemid IN (62658, 64209)
+      WHERE i.itemid IN (?)
       ORDER BY h.name
-    `);
+    `,
+      [ids, ids, ids],
+    );
   }
 
   async getAgentAvailabilityHistory(
@@ -358,7 +377,10 @@ export class ZabbixService implements OnModuleInit {
   }
 
   async getUptimeStats(): Promise<unknown[]> {
-    return this.zabbixDataSource.query(`
+    const ids = await this.itemIdsByKey('system.uptime');
+    if (!ids.length) return [];
+    return this.zabbixDataSource.query(
+      `
       SELECT /*+ MAX_EXECUTION_TIME(20000) */
         h.name as host,
         i.itemid,
@@ -382,9 +404,11 @@ export class ZabbixService implements OnModuleInit {
         ) as restart_count
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.itemid IN (62651, 64202)
+      WHERE i.itemid IN (?)
       ORDER BY h.name
-    `);
+    `,
+      [ids],
+    );
   }
 
   async getUptimeHistory(
@@ -514,13 +538,25 @@ export class ZabbixService implements OnModuleInit {
     return this.sfpPortsCache;
   }
 
-  private async computeSfpPortsStats(): Promise<unknown[]> {
-    const SFP_ITEM_IDS = [68527, 68529, 68530];
+  // SW1's SFP uplink ports are 49/50/51. Resolved by host name + item key
+  // (not item ID) so the lookup survives the host being re-created or
+  // re-discovered in Zabbix.
+  private static readonly SFP_PORT_KEYS = [
+    'ifOperStatus.49',
+    'ifOperStatus.50',
+    'ifOperStatus.51',
+  ];
 
+  private async computeSfpPortsStats(): Promise<unknown[]> {
     const items: any[] = await this.zabbixDataSource.query(
-      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ itemid, name, key_
-       FROM items WHERE itemid IN (?)`,
-      [SFP_ITEM_IDS],
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, i.name, i.key_
+       FROM items i
+       JOIN hosts h ON h.hostid = i.hostid
+       WHERE h.name = 'SW1'
+         AND h.status = 0
+         AND i.status = 0
+         AND i.key_ IN (?)`,
+      [ZabbixService.SFP_PORT_KEYS],
     );
 
     const results: {
@@ -638,16 +674,21 @@ export class ZabbixService implements OnModuleInit {
   }
 
   private async computeSwitchUptimeStats(): Promise<unknown[]> {
-    const UPTIME_ITEM_IDS = [68383, 68052, 67018, 67802, 68230, 67660];
-
+    // Discover switches instead of hardcoding item IDs: item IDs change
+    // whenever a host is deleted/re-created or re-discovered in Zabbix
+    // (SW1 once vanished from the dashboard this way). Host name + item
+    // key survive that. Any monitored host named SW* with an enabled
+    // 'Uptime' item shows up here automatically.
     const items: any[] = await this.zabbixDataSource.query(
       `SELECT /*+ MAX_EXECUTION_TIME(5000) */
          i.itemid, i.hostid, h.name as switch_name
        FROM items i
        JOIN hosts h ON h.hostid = i.hostid
-       WHERE i.itemid IN (?)
+       WHERE i.key_ = 'Uptime'
+         AND h.name LIKE 'SW%'
+         AND h.status = 0
+         AND i.status = 0
        ORDER BY h.name`,
-      [UPTIME_ITEM_IDS],
     );
 
     // Latest status of every physical port on these switches, counted per
@@ -851,151 +892,108 @@ export class ZabbixService implements OnModuleInit {
   async getReportCharts(): Promise<unknown> {
     const fromTs = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
 
-    const SERVICE_DEFS = [
-      {
-        itemid: 64317,
-        label: 'SAGE-SRV – État du service MSSQL$SAGE100',
-        host: 'SAGE-SRV',
-        type: 'service',
-        service: 'MSSQL$SAGE100',
-      },
-      {
-        itemid: 64336,
-        label: 'SAGE-SRV – État du service SQLAgent$SAGE100',
-        host: 'SAGE-SRV',
-        type: 'service',
-        service: 'SQLAgent$SAGE100',
-      },
-      {
-        itemid: 64319,
-        label: 'SAGE-SRV – État du service Netlogon',
-        host: 'SAGE-SRV',
-        type: 'service',
-        service: 'Netlogon',
-      },
-      {
-        itemid: 62724,
-        label: 'DC-SRV – État du service NTDS (AD DS)',
-        host: 'DC-SRV',
-        type: 'service',
-        service: 'NTDS',
-      },
-      {
-        itemid: 62703,
-        label: 'DC-SRV – État du service DNS',
-        host: 'DC-SRV',
-        type: 'service',
-        service: 'DNS',
-      },
-      {
-        itemid: 62713,
-        label: 'DC-SRV – État du service KDC (Kerberos)',
-        host: 'DC-SRV',
-        type: 'service',
-        service: 'KDC',
-      },
-      {
-        itemid: 62721,
-        label: 'DC-SRV – État du service Netlogon',
-        host: 'DC-SRV',
-        type: 'service',
-        service: 'Netlogon',
-      },
-      {
-        itemid: 62753,
-        label: 'DC-SRV – État du service vmms (Hyper-V)',
-        host: 'DC-SRV',
-        type: 'service',
-        service: 'vmms',
-      },
-    ];
+    // Report chart definitions are discovered from the DB by host + item
+    // key (never by item ID), so re-created hosts keep working and newly
+    // monitored servers/services appear in the report automatically.
+    const SERVICE_ANNOTATIONS: Record<string, string> = {
+      NTDS: 'NTDS (AD DS)',
+      Kdc: 'KDC (Kerberos)',
+      vmms: 'vmms (Hyper-V)',
+    };
 
-    const UPTIME_DEFS = [
-      {
-        itemid: 64202,
-        label: 'SAGE-SRV – Uptime (redémarrages)',
-        host: 'SAGE-SRV',
-        type: 'uptime',
-        service: '',
-      },
-      {
-        itemid: 62651,
-        label: 'DC-SRV – Uptime (redémarrages)',
-        host: 'DC-SRV',
-        type: 'uptime',
-        service: '',
-      },
-    ];
+    const serviceRows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as host, i.key_
+       FROM items i JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ LIKE 'service.info[%'
+         AND h.status = 0 AND i.status = 0
+       ORDER BY h.name, i.key_`,
+    );
+    const SERVICE_DEFS = serviceRows.map((r: any) => {
+      const m = /service\.info\["?([^",\]]+)"?/.exec(String(r.key_));
+      const svc = m ? m[1] : String(r.key_);
+      return {
+        itemid: Number(r.itemid),
+        label: `${String(r.host)} – État du service ${SERVICE_ANNOTATIONS[svc] ?? svc}`,
+        host: String(r.host),
+        type: 'service',
+        service: svc,
+      };
+    });
 
-    const AGENT_DEFS = [
-      {
-        itemid: 64209,
-        label: 'SAGE-SRV – Disponibilité agent Zabbix',
-        host: 'SAGE-SRV',
-        type: 'agent',
-        service: '',
-      },
-      {
-        itemid: 62658,
-        label: 'DC-SRV – Disponibilité agent Zabbix',
-        host: 'DC-SRV',
-        type: 'agent',
-        service: '',
-      },
-    ];
+    const uptimeRows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as host
+       FROM items i JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ = 'system.uptime'
+         AND h.status = 0 AND i.status = 0
+       ORDER BY h.name`,
+    );
+    const UPTIME_DEFS = uptimeRows.map((r: any) => ({
+      itemid: Number(r.itemid),
+      label: `${String(r.host)} – Uptime (redémarrages)`,
+      host: String(r.host),
+      type: 'uptime',
+      service: '',
+    }));
 
+    const agentRows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as host
+       FROM items i JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ = 'zabbix[host,agent,available]'
+         AND h.status = 0 AND i.status = 0
+       ORDER BY h.name`,
+    );
+    const AGENT_DEFS = agentRows.map((r: any) => ({
+      itemid: Number(r.itemid),
+      label: `${String(r.host)} – Disponibilité agent Zabbix`,
+      host: String(r.host),
+      type: 'agent',
+      service: '',
+    }));
+
+    // SFP uplink ports, discovered by host name + item key so the report
+    // keeps working when hosts are re-created in Zabbix (item IDs change,
+    // names and keys don't): SW1's three uplinks plus port 49 of the
+    // remote-site switches (any SW* host whose name ends in AQ or QVM).
     const SFP_DEFS: {
       itemid: number;
       label: string;
       host: string;
       type: string;
       service: string;
-    }[] = [
-      {
-        itemid: 64499,
-        label: 'SW1 – Port SFP 49',
-        host: 'SW1',
-        type: 'sfp',
-        service: '',
-      },
-      {
-        itemid: 64501,
-        label: 'SW1 – Port SFP 50',
-        host: 'SW1',
-        type: 'sfp',
-        service: '',
-      },
-      {
-        itemid: 64502,
-        label: 'SW1 – Port SFP 51',
-        host: 'SW1',
-        type: 'sfp',
-        service: '',
-      },
-    ];
-
-    // Dynamic lookup for SW-AQ / SW-QVM SFP port 49
-    const dynSfp: any[] = await this.zabbixDataSource.query(
-      `SELECT i.itemid, h.name as switch_name
+    }[] = [];
+    const sfpRows: any[] = await this.zabbixDataSource.query(
+      `SELECT i.itemid, h.name as switch_name, i.key_
        FROM items i JOIN hosts h ON h.hostid = i.hostid
-       WHERE h.name IN ('SW-AQ','SW-QVM') AND i.key_ LIKE 'ifOperStatus.49'
-       ORDER BY h.name`,
+       WHERE h.status = 0 AND i.status = 0
+         AND (
+           (h.name = 'SW1' AND i.key_ IN (?))
+           OR (
+             (h.name LIKE 'SW%AQ' OR h.name LIKE 'SW%QVM')
+             AND i.key_ = 'ifOperStatus.49'
+           )
+         )
+       ORDER BY h.name, i.key_`,
+      [ZabbixService.SFP_PORT_KEYS],
     );
-    dynSfp.forEach((r: any) => {
+    sfpRows.forEach((r: any) => {
+      const port = String(r.key_).replace('ifOperStatus.', '');
       SFP_DEFS.push({
         itemid: Number(r.itemid),
-        label: `${String(r.switch_name)} – Port SFP 49`,
+        label: `${String(r.switch_name)} – Port SFP ${port}`,
         host: String(r.switch_name),
         type: 'sfp',
         service: '',
       });
     });
 
-    // Switch uptimes — one representative item per switch host
+    // Switch uptimes — every monitored SW* host with an enabled Uptime item
     const swRows: any[] = await this.zabbixDataSource.query(
       `SELECT i.itemid, h.name as switch_name
        FROM items i JOIN hosts h ON h.hostid = i.hostid
-       WHERE i.itemid IN (68383,68052,67018,67802,68230,67660)
+       WHERE i.key_ = 'Uptime'
+         AND h.name LIKE 'SW%'
+         AND h.status = 0
+         AND i.status = 0
        ORDER BY h.name, i.itemid`,
     );
     const seenSw = new Set<string>();
