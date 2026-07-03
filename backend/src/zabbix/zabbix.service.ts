@@ -638,7 +638,7 @@ export class ZabbixService implements OnModuleInit {
   }
 
   private async computeSwitchUptimeStats(): Promise<unknown[]> {
-    const UPTIME_ITEM_IDS = [64359, 68052, 67018, 67802, 68230, 67660];
+    const UPTIME_ITEM_IDS = [68383, 68052, 67018, 67802, 68230, 67660];
 
     const items: any[] = await this.zabbixDataSource.query(
       `SELECT /*+ MAX_EXECUTION_TIME(5000) */
@@ -995,7 +995,7 @@ export class ZabbixService implements OnModuleInit {
     const swRows: any[] = await this.zabbixDataSource.query(
       `SELECT i.itemid, h.name as switch_name
        FROM items i JOIN hosts h ON h.hostid = i.hostid
-       WHERE i.itemid IN (64359,68052,67018,67802,68230,67660)
+       WHERE i.itemid IN (68383,68052,67018,67802,68230,67660)
        ORDER BY h.name, i.itemid`,
     );
     const seenSw = new Set<string>();
