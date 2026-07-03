@@ -30,7 +30,11 @@ const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
       database: process.env.DB_ZABBIX_NAME ?? 'zabbix',
       synchronize: false,
       autoLoadEntities: true,
-      extra: { connectionLimit: 10 },
+      // queueLimit caps how many requests can be waiting for a free pooled
+      // connection at once — beyond that they fail immediately instead of
+      // queueing forever. MAX_EXECUTION_TIME query hints only bound a query
+      // once it's already running, they don't help if every connection is stuck.
+      extra: { connectionLimit: 10, queueLimit: 20 },
     }),
     ...(glpiEnabled
       ? [
