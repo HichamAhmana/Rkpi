@@ -34,7 +34,12 @@ const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
       // connection at once — beyond that they fail immediately instead of
       // queueing forever. MAX_EXECUTION_TIME query hints only bound a query
       // once it's already running, they don't help if every connection is stuck.
-      extra: { connectionLimit: 10, queueLimit: 20 },
+      // resetOnRelease clears session state (temp tables, leftover locks,
+      // interrupted-query residue) before a connection goes back into the
+      // pool — without it, a connection killed by MAX_EXECUTION_TIME could
+      // come back in a bad state and make the *next*, unrelated query on
+      // that same connection fail too.
+      extra: { connectionLimit: 10, queueLimit: 20, resetOnRelease: true },
     }),
     ...(glpiEnabled
       ? [
