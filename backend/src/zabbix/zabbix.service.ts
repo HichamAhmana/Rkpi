@@ -270,34 +270,30 @@ export class ZabbixService {
         (SELECT hu.value FROM history_uint hu
          WHERE hu.itemid = i.itemid
          ORDER BY hu.clock DESC LIMIT 1) as current_status,
-        -- Availability % over 30 days
-        ROUND(
-          (SELECT AVG(CASE WHEN hu.value = 1 THEN 1.0 ELSE 0.0 END) * 100
-           FROM history_uint hu
-           WHERE hu.itemid = i.itemid
-           AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-          ), 4
-        ) as availability_pct,
-        -- Total checks
-        (SELECT COUNT(*) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as total_checks,
-        -- Unavailable count
-        (SELECT COUNT(*) FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value != 1
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as unavailable_checks,
-        -- Last unavailable time
-        (SELECT FROM_UNIXTIME(MAX(hu.clock))
-         FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value != 1
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as last_unavailable
+        stats.availability_pct,
+        stats.total_checks,
+        stats.unavailable_checks,
+        FROM_UNIXTIME(stats.last_unavailable_clock) as last_unavailable
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
+      LEFT JOIN (
+        SELECT
+          hu.itemid,
+          COUNT(*) as total_checks,
+          SUM(CASE WHEN hu.value != 1 THEN 1 ELSE 0 END) as unavailable_checks,
+          ROUND(AVG(CASE WHEN hu.value = 1 THEN 1.0 ELSE 0.0 END) * 100, 4) as availability_pct,
+          MAX(CASE WHEN hu.value != 1 THEN hu.clock END) as last_unavailable_clock
+        FROM history_uint hu
+        JOIN (
+          SELECT itemid, MAX(clock) as max_clock
+          FROM history_uint
+          WHERE itemid IN (62658, 64209)
+          GROUP BY itemid
+        ) bounds ON bounds.itemid = hu.itemid
+         AND hu.clock >= bounds.max_clock - (30 * 24 * 3600)
+        WHERE hu.itemid IN (62658, 64209)
+        GROUP BY hu.itemid
+      ) stats ON stats.itemid = i.itemid
       WHERE i.itemid IN (62658, 64209)
       ORDER BY h.name
     `);
