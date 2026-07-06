@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { FileText, CheckCircle, XCircle, Clock, TrendingUp, AlertCircle, Filter, Calendar, Target, ShieldAlert } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, TrendingUp, AlertCircle, Filter, Calendar, Target, ShieldAlert, ChevronDown } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import { BRAND } from '../styles/colors';
@@ -17,14 +17,19 @@ import { DashboardSkeleton } from '../components/SkeletonLoader';
 
 const POLL_INTERVAL = 60_000; // 60 seconds
 
-const AVAILABLE_MONTHS = ['all', '2026-02', '2026-03', '2026-04', '2026-05'];
+const MONTHS_FR_FULL = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
 
 const GlpiDashboard: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter States
-  const [selectedMonth, setSelectedMonth] = useState('2026-04');
+  // Filter States — the month list is derived from the ticket data, so new
+  // months appear in the dropdown by themselves; 'all' until the first load
+  // picks the most recent month.
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const [ticketType, setTicketType] = useState<number | undefined>(undefined); // undefined = All, 1 = Incidents, 2 = Demandes
 
   // Data States
@@ -62,6 +67,10 @@ const GlpiDashboard: React.FC = () => {
         if (!hasLoadedOnceRef.current) {
           hasLoadedOnceRef.current = true;
           setInitialLoading(false);
+          // Focus the most recent month once we know which months exist
+          if (volume.length > 0) {
+            setSelectedMonth(volume[volume.length - 1].month);
+          }
         }
       }
     } catch (err) {
@@ -345,14 +354,11 @@ const GlpiDashboard: React.FC = () => {
   ];
 
   const getMonthNameFr = (monthStr: string) => {
-    const monthsFr: Record<string, string> = {
-      'all': 'Global (Tous les mois)',
-      '2026-02': 'Février',
-      '2026-03': 'Mars',
-      '2026-04': 'Avril',
-      '2026-05': 'Mai',
-    };
-    return monthsFr[monthStr] || monthStr;
+    if (monthStr === 'all') return 'Global (Tous les mois)';
+    const parts = monthStr.split('-');
+    if (parts.length !== 2) return monthStr;
+    const name = MONTHS_FR_FULL[Number(parts[1]) - 1];
+    return name ? `${name} ${parts[0]}` : monthStr;
   };
 
   // Calculating monthly volume change dynamically
@@ -433,37 +439,40 @@ const GlpiDashboard: React.FC = () => {
           <span>Filtres Tableau de Bord :</span>
         </div>
         <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-          {/* Month Selector */}
-          <div className="flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-1.5 w-full sm:w-auto">
-            <Calendar className="w-4 h-4 text-[#64748B] mr-2 shrink-0" />
+          {/* Month Selector — options come from the ticket data itself */}
+          <div className="relative flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg pl-3 pr-8 py-2 w-full sm:w-auto transition-colors duration-150 hover:border-[#2B5BA8]/50 focus-within:border-[#2B5BA8] focus-within:ring-2 focus-within:ring-[#2B5BA8]/10">
+            <Calendar className="w-4 h-4 text-[#2B5BA8] mr-2 shrink-0" />
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full"
+              className="appearance-none bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[150px]"
             >
-              {AVAILABLE_MONTHS.map((m) => (
-                <option key={m} value={m}>
-                  {m === '2026-04' ? 'Avril 2026 (Focus)' : m === '2026-03' ? 'Mars 2026' : m === '2026-02' ? 'Février 2026' : m === '2026-05' ? 'Mai 2026' : m}
+              <option value="all">Tous les mois (Global)</option>
+              {[...volumeData].reverse().map((d) => (
+                <option key={d.month} value={d.month}>
+                  {getMonthNameFr(d.month)}
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-4 h-4 text-[#94A3B8] absolute right-2.5 pointer-events-none" />
           </div>
 
           {/* Type Selector */}
-          <div className="flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-1.5 w-full sm:w-auto">
-            <Target className="w-4 h-4 text-[#64748B] mr-2 shrink-0" />
+          <div className="relative flex items-center bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg pl-3 pr-8 py-2 w-full sm:w-auto transition-colors duration-150 hover:border-[#2B5BA8]/50 focus-within:border-[#2B5BA8] focus-within:ring-2 focus-within:ring-[#2B5BA8]/10">
+            <Target className="w-4 h-4 text-[#2B5BA8] mr-2 shrink-0" />
             <select
               value={ticketType === undefined ? 'all' : ticketType.toString()}
               onChange={(e) => {
                 const val = e.target.value;
                 setTicketType(val === 'all' ? undefined : parseInt(val, 10));
               }}
-              className="bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full"
+              className="appearance-none bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[170px]"
             >
               <option value="all">Tous les tickets (Global)</option>
               <option value="1">Incidents Techniques</option>
               <option value="2">Demandes de Service</option>
             </select>
+            <ChevronDown className="w-4 h-4 text-[#94A3B8] absolute right-2.5 pointer-events-none" />
           </div>
         </div>
       </div>
@@ -486,9 +495,7 @@ const GlpiDashboard: React.FC = () => {
               {kpiSummary.ticketsCreated}
             </div>
             <p className="text-[12px] text-slate-400">
-              {selectedMonth === '2026-04' && ticketType === undefined
-                ? 'Activité modérée après le pic de mars'
-                : 'Nombre de tickets ouverts sur la période'}
+              Nombre de tickets ouverts sur la période
             </p>
           </div>
 
@@ -564,9 +571,7 @@ const GlpiDashboard: React.FC = () => {
                   <span className="text-[16px] font-semibold text-slate-400">heures</span>
                 </div>
                 <p className="text-[12px] text-slate-400 mt-1">
-                  {selectedMonth === '2026-04' && ticketType === undefined
-                    ? 'Prise en charge en ~0,5 journée ouvrée'
-                    : 'Délai moyen de prise en charge'}
+                  Délai moyen de prise en charge
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
                   Calcul : moyenne (date de prise en charge − date de création)
@@ -592,9 +597,7 @@ const GlpiDashboard: React.FC = () => {
                   <span className="text-[16px] font-semibold text-slate-400">heures</span>
                 </div>
                 <p className="text-[12px] text-slate-400 mt-1">
-                  {selectedMonth === '2026-04' && ticketType === undefined
-                    ? 'Valeur la plus élevée sur la période affichée'
-                    : 'Délai moyen de clôture des tickets'}
+                  Délai moyen de clôture des tickets
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
                   Calcul : moyenne (date de résolution − date de création)
@@ -727,7 +730,7 @@ const GlpiDashboard: React.FC = () => {
 
               <div className="text-[13px] text-[#475569] space-y-3 leading-relaxed">
                 <p>
-                  <strong>Time to Own = {selectedMonth === '2026-04' ? '11.4 heures' : `${kpiSummary.timeToOwn.toFixed(1)} heures`}</strong> en moyenne.
+                  <strong>Time to Own = {kpiSummary.timeToOwn.toFixed(1)} heures</strong> en moyenne.
                 </p>
                 <p>
                   Temps de réaction global très satisfaisant (~{(kpiSummary.timeToOwn / 24).toFixed(1)} j).
@@ -771,7 +774,7 @@ const GlpiDashboard: React.FC = () => {
 
               <div className="text-[13px] text-[#475569] space-y-3 leading-relaxed">
                 <p>
-                  <strong>Time to Close = {selectedMonth === '2026-04' ? '33.5 heures' : `${kpiSummary.timeToClose.toFixed(1)} heures`}</strong> en moyenne.
+                  <strong>Time to Close = {kpiSummary.timeToClose.toFixed(1)} heures</strong> en moyenne.
                 </p>
                 <p>
                   Écart moyen entre prise en charge et clôture : <strong className="text-[#0F172A]">{(kpiSummary.timeToClose - kpiSummary.timeToOwn).toFixed(1)} heures</strong>.
