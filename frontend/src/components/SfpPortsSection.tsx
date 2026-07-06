@@ -568,7 +568,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
 
           <div className="flex items-center gap-3">
             <span
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
               style={{
                 backgroundColor: isStable ? '#E6FDF0' : (isDown ? '#FEECEE' : '#FFF3D6'),
                 color: accentColor,
@@ -618,7 +618,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
               <Activity className="w-4.5 h-4.5 animate-pulse" />
             </div>
             <div className="min-w-0">
-              <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Fibre Optic Link</div>
+              <div className="text-[12px] text-[#94A3B8] font-bold uppercase tracking-wider">Fibre Optic Link</div>
               <div className="text-[18px] font-extrabold text-[#0F172A] mt-0.5 truncate">
                 {avgValue !== null ? `${(avgValue * 100).toFixed(2)}%` : '—'} Average Uptime
               </div>
@@ -626,7 +626,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
           </div>
 
           {/* Micro laser wave label - in flex flow */}
-          <div className="flex-shrink-0 z-10 flex items-center gap-1 text-[10px] text-[#94A3B8] font-mono font-bold">
+          <div className="flex-shrink-0 z-10 flex items-center gap-1 text-[12px] text-[#94A3B8] font-mono font-bold">
             <span>TX/RX: OK</span>
           </div>
         </div>

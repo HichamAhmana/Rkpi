@@ -386,7 +386,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
               <span className={`text-[18px] font-bold ${service.incident_days === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
                 {service.incident_days}
               </span>
-              <span className="text-[10px] text-slate-400 mt-0.5">
+              <span className="text-[12px] text-slate-400 mt-0.5">
                 = days with ≥ 1 non-running state in the last 30 days
               </span>
             </div>
@@ -626,8 +626,8 @@ const ServerSection: React.FC<ServerSectionProps> = ({
         <div className="flex items-center gap-3">
           {/* Mobile indicator counts */}
           <div className="sm:hidden flex gap-1.5 items-center">
-            {stats.stopped > 0 && <span className="w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">{stats.stopped}</span>}
-            {stats.anomaly > 0 && <span className="w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-amber-500 rounded-full">{stats.anomaly}</span>}
+            {stats.stopped > 0 && <span className="w-4 h-4 flex items-center justify-center text-[12px] font-bold text-white bg-red-500 rounded-full">{stats.stopped}</span>}
+            {stats.anomaly > 0 && <span className="w-4 h-4 flex items-center justify-center text-[12px] font-bold text-white bg-amber-500 rounded-full">{stats.anomaly}</span>}
           </div>
           
           <button className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">

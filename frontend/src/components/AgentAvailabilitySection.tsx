@@ -342,7 +342,7 @@ const ExpandedAgentPanel: React.FC<ExpandedAgentPanelProps> = ({
                 <metric.icon className="w-3.5 h-3.5" style={{ color: metric.color }} />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
+                <p className="text-[12px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
                 <p className="text-[15px] font-bold text-[#0F172A] truncate">{metric.value}</p>
               </div>
             </div>
@@ -501,7 +501,7 @@ const AgentCard: React.FC<AgentCardProps> = ({
             <div className="min-w-0 flex items-center gap-2.5">
               <h3 className="text-[18px] font-bold text-[#0F172A] truncate">{agent.host}</h3>
               <span
-                className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                 style={{
                   backgroundColor: isAvailable ? '#F0FDF4' : '#FEF2F2',
                   color: isAvailable ? '#15803d' : '#EF4444',
@@ -531,7 +531,7 @@ const AgentCard: React.FC<AgentCardProps> = ({
           <div className="relative flex-shrink-0">
             <AvailabilityRing percentage={pctNum} color={color} size={56} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-[#64748B]">{Math.round(pctNum)}%</span>
+              <span className="text-[12px] font-bold text-[#64748B]">{Math.round(pctNum)}%</span>
             </div>
           </div>
 
@@ -554,7 +554,7 @@ const AgentCard: React.FC<AgentCardProps> = ({
             </div>
 
             {/* Calculation explanation */}
-            <p className="text-[10px] text-label mt-1.5">
+            <p className="text-[12px] text-label mt-1.5">
               = {formatNumber(availableChecks)} OK checks ÷ {formatNumber(agent.total_checks)} total × 100 · last 30 days
             </p>
           </div>

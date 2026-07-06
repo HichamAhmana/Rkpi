@@ -383,7 +383,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
                 <metric.icon className="w-3.5 h-3.5" style={{ color: metric.color }} />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
+                <p className="text-[12px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
                 <p className="text-[15px] font-bold text-[#0F172A] truncate">{metric.value}</p>
               </div>
             </div>
@@ -573,7 +573,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
             <div className="min-w-0 flex items-center gap-2.5">
               <h3 className="text-[18px] font-bold text-[#0F172A] truncate">{stat.host}</h3>
               <span
-                className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: statusBg, color: statusColor }}
               >
                 <span
@@ -604,7 +604,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
           <div className="relative flex-shrink-0">
             <UptimeRing percentage={uptimePercent} color={statusColor === '#15803d' ? '#2B5BA8' : '#EF4444'} size={56} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-[#64748B]">{Math.round(uptimePercent)}%</span>
+              <span className="text-[12px] font-bold text-[#64748B]">{Math.round(uptimePercent)}%</span>
             </div>
           </div>
 
@@ -626,7 +626,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
             </div>
             <p className="text-[15px] text-[#94A3B8]">{bootDateStr}</p>
             {/* Calculation explanation */}
-            <p className="text-[10px] text-label mt-1">
+            <p className="text-[12px] text-label mt-1">
               Ring {Math.round(uptimePercent)}% = current uptime ÷ 30 days × 100
             </p>
           </div>

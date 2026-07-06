@@ -548,7 +548,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
           
           <div className="flex items-center gap-3">
             <span
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: statusBg, color: statusColor }}
             >
               <span
@@ -583,7 +583,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
         {/* Port Availability progress bar */}
         <div className="bg-[#F8FAFC] border border-[#F1F5F9] p-3.5 rounded-xl">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-[#94A3B8] font-bold">Port Connectivity</span>
+            <span className="text-[12px] uppercase tracking-wider text-[#94A3B8] font-bold">Port Connectivity</span>
             <span className="text-[18px] font-extrabold text-[#0F172A]">
               {stat.up_ports}/{stat.total_ports} ports &middot; {portPct}%
             </span>
@@ -598,7 +598,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
             />
           </div>
           {/* Calculation explanation */}
-          <p className="text-[10px] text-label mt-1.5">
+          <p className="text-[12px] text-label mt-1.5">
             {portPct}% = {stat.up_ports} ports up ÷ {stat.total_ports} total × 100
           </p>
         </div>
