@@ -113,10 +113,10 @@ const GlpiDashboard: React.FC = () => {
             <ShieldAlert className="w-7 h-7 text-[#EF4444]" />
           </div>
           <h2 className="text-[18px] font-semibold text-[#0F172A] mb-2">Unable to Load GLPI Data</h2>
-          <p className="text-[14px] text-[#94A3B8] mb-6">{error || 'Incomplete data received.'}</p>
+          <p className="text-[18px] text-[#94A3B8] mb-6">{error || 'Incomplete data received.'}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2.5 rounded-lg text-[14px] font-medium text-white transition-colors"
+            className="px-5 py-2.5 rounded-lg text-[18px] font-medium text-white transition-colors"
             style={{ backgroundColor: '#2B5BA8' }}
           >
             Try Again
@@ -200,7 +200,7 @@ const GlpiDashboard: React.FC = () => {
       enabled: true,
       offsetY: -22,
       style: {
-        fontSize: '11px',
+        fontSize: '15px',
         fontFamily: 'Inter, sans-serif',
         fontWeight: '600',
         colors: volumeData.map((d) => selectedMonth === 'all' || d.month === selectedMonth ? '#1E293B' : '#64748B'),
@@ -210,7 +210,7 @@ const GlpiDashboard: React.FC = () => {
     xaxis: {
       categories: volumeData.map((d) => d.month),
       labels: {
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
         formatter: formatMonthFr,
       },
       axisBorder: { show: false },
@@ -218,10 +218,10 @@ const GlpiDashboard: React.FC = () => {
     },
     yaxis: {
       max: (max: number) => max + 5, // 5 tickets of headroom so label is never cut off
-      labels: { style: { colors: '#94A3B8', fontSize: '11px' } },
+      labels: { style: { colors: '#94A3B8', fontSize: '15px' } },
       title: {
         text: 'Nombre de Tickets',
-        style: { color: '#94A3B8', fontSize: '11px', fontWeight: 500 },
+        style: { color: '#94A3B8', fontSize: '15px', fontWeight: 500 },
       },
     },
     grid: {
@@ -290,7 +290,7 @@ const GlpiDashboard: React.FC = () => {
     xaxis: {
       categories: trends.timeToOwn.map((d) => d.month),
       labels: {
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
         formatter: formatMonthFr,
       },
       axisBorder: { show: false },
@@ -298,12 +298,12 @@ const GlpiDashboard: React.FC = () => {
     },
     yaxis: {
       labels: {
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
         formatter: (val) => `${val.toFixed(1)} h`,
       },
       title: {
         text: 'Heures',
-        style: { color: '#94A3B8', fontSize: '11px', fontWeight: 500 },
+        style: { color: '#94A3B8', fontSize: '15px', fontWeight: 500 },
       },
     },
     grid: {
@@ -314,7 +314,7 @@ const GlpiDashboard: React.FC = () => {
       position: 'top',
       horizontalAlign: 'right',
       labels: { colors: '#475569' },
-      fontSize: '12px',
+      fontSize: '14px',
     },
     fill: {
       type: 'gradient',
@@ -434,7 +434,7 @@ const GlpiDashboard: React.FC = () => {
     <div className="space-y-8">
       {/* Filtering Header Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm">
-        <div className="flex items-center gap-2 text-[#475569] font-medium text-[14px]">
+        <div className="flex items-center gap-2 text-[#475569] font-medium text-[18px]">
           <Filter className="w-4 h-4 text-[#2B5BA8]" />
           <span>Filtres Tableau de Bord :</span>
         </div>
@@ -445,7 +445,7 @@ const GlpiDashboard: React.FC = () => {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[150px]"
+              className="appearance-none bg-transparent text-[15px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[150px]"
             >
               <option value="all">Tous les mois (Global)</option>
               {[...volumeData].reverse().map((d) => (
@@ -466,7 +466,7 @@ const GlpiDashboard: React.FC = () => {
                 const val = e.target.value;
                 setTicketType(val === 'all' ? undefined : parseInt(val, 10));
               }}
-              className="appearance-none bg-transparent text-[13px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[170px]"
+              className="appearance-none bg-transparent text-[15px] text-[#334155] font-semibold focus:outline-none cursor-pointer w-full sm:min-w-[170px]"
             >
               <option value="all">Tous les tickets (Global)</option>
               <option value="1">Incidents Techniques</option>
@@ -486,15 +486,15 @@ const GlpiDashboard: React.FC = () => {
                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#2B5BA8]" />
             <div className="flex items-start justify-between mb-4">
-              <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400">Tickets Créés</p>
+              <p className="text-[15px] font-bold tracking-widest uppercase text-slate-400">Tickets Créés</p>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-blue-100 bg-blue-50/60">
                 <FileText className="w-[18px] h-[18px] text-[#2B5BA8]" />
               </div>
             </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none mb-2">
+            <div className="text-[36px] font-extrabold tracking-tight text-slate-900 leading-none mb-2">
               {kpiSummary.ticketsCreated}
             </div>
-            <p className="text-[12px] text-slate-400">
+            <p className="text-[18px] text-slate-400">
               Nombre de tickets ouverts sur la période
             </p>
           </div>
@@ -504,15 +504,15 @@ const GlpiDashboard: React.FC = () => {
                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#3DBE7A]" />
             <div className="flex items-start justify-between mb-4">
-              <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400">Tickets Clos</p>
+              <p className="text-[15px] font-bold tracking-widest uppercase text-slate-400">Tickets Clos</p>
               <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-emerald-100 bg-emerald-50/60">
                 <CheckCircle className="w-[18px] h-[18px] text-[#3DBE7A]" />
               </div>
             </div>
-            <div className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none mb-2">
+            <div className="text-[36px] font-extrabold tracking-tight text-slate-900 leading-none mb-2">
               {kpiSummary.ticketsClosed}
             </div>
-            <p className="text-[12px] text-slate-400">Total clôturés sur la période sélectionnée</p>
+            <p className="text-[18px] text-slate-400">Total clôturés sur la période sélectionnée</p>
           </div>
 
           {/* Taux de Résolution */}
@@ -527,16 +527,16 @@ const GlpiDashboard: React.FC = () => {
                    style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: accent }} />
                 <div className="flex items-start justify-between mb-4">
-                  <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400">Taux de Résolution</p>
+                  <p className="text-[15px] font-bold tracking-widest uppercase text-slate-400">Taux de Résolution</p>
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${borderTint} ${iconBg}`}>
                     <TrendingUp className="w-[18px] h-[18px]" style={{ color: accent }} />
                   </div>
                 </div>
                 <div className="flex items-baseline gap-3 mb-3">
-                  <span className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none">
+                  <span className="text-[36px] font-extrabold tracking-tight text-slate-900 leading-none">
                     {kpiSummary.resolutionRate.toFixed(1)}%
                   </span>
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold border inline-flex items-center gap-1"
+                  <span className="px-2 py-0.5 rounded-md text-[15px] font-bold border inline-flex items-center gap-1"
                         style={{ backgroundColor: bgTint, borderColor: accent + '25', color: accent }}>
                     {targetMet ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                     {targetMet ? 'Cible 90% atteinte' : 'Sous la cible 90%'}
@@ -547,7 +547,7 @@ const GlpiDashboard: React.FC = () => {
                   <div className="h-full rounded-full transition-all duration-700 ease-out"
                        style={{ width: `${Math.min(kpiSummary.resolutionRate, 100)}%`, backgroundColor: accent }} />
                 </div>
-                <p className="text-[12px] text-slate-400 mt-2">
+                <p className="text-[18px] text-slate-400 mt-2">
                   Calcul : {kpiSummary.ticketsClosed} tickets clos ÷ {kpiSummary.ticketsCreated} tickets créés × 100
                 </p>
               </div>
@@ -563,17 +563,17 @@ const GlpiDashboard: React.FC = () => {
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#F59E0B]" />
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-3">Time to Own — Prise en Charge</p>
+                <p className="text-[15px] font-bold tracking-widest uppercase text-slate-400 mb-3">Time to Own — Prise en Charge</p>
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none">
+                  <span className="text-[36px] font-extrabold tracking-tight text-slate-900 leading-none">
                     {kpiSummary.timeToOwn.toFixed(1)}
                   </span>
-                  <span className="text-[16px] font-semibold text-slate-400">heures</span>
+                  <span className="text-[18px] font-semibold text-slate-400">heures</span>
                 </div>
-                <p className="text-[12px] text-slate-400 mt-1">
+                <p className="text-[18px] text-slate-400 mt-1">
                   Délai moyen de prise en charge
                 </p>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[15px] text-slate-400 mt-1">
                   Calcul : moyenne (date de prise en charge − date de création)
                 </p>
               </div>
@@ -589,17 +589,17 @@ const GlpiDashboard: React.FC = () => {
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#E24A8D]" />
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-3">Time to Close — Résolution</p>
+                <p className="text-[15px] font-bold tracking-widest uppercase text-slate-400 mb-3">Time to Close — Résolution</p>
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-[32px] font-extrabold tracking-tight text-slate-900 leading-none">
+                  <span className="text-[36px] font-extrabold tracking-tight text-slate-900 leading-none">
                     {kpiSummary.timeToClose.toFixed(1)}
                   </span>
-                  <span className="text-[16px] font-semibold text-slate-400">heures</span>
+                  <span className="text-[18px] font-semibold text-slate-400">heures</span>
                 </div>
-                <p className="text-[12px] text-slate-400 mt-1">
+                <p className="text-[18px] text-slate-400 mt-1">
                   Délai moyen de clôture des tickets
                 </p>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[15px] text-slate-400 mt-1">
                   Calcul : moyenne (date de résolution − date de création)
                 </p>
               </div>
@@ -614,7 +614,7 @@ const GlpiDashboard: React.FC = () => {
       {/* KPI Context Banner for Incidents vs Requests */}
       <div className="p-4 rounded-xl border border-blue-100 bg-[#F0F7FF] flex items-start gap-3 shadow-sm">
         <AlertCircle className="w-5 h-5 text-[#2B5BA8] shrink-0 mt-0.5" />
-        <div className="text-[13px] text-[#1E3A8A]">
+        <div className="text-[15px] text-[#1E3A8A]">
           <span className="font-bold">Analyse Micro-UX : </span>
           Ce KPI global est influencé principalement par les demandes de service longues (validations, approvisionnements). 
           Cela ne signifie pas que le support est lent sur les incidents critiques. 
@@ -632,8 +632,8 @@ const GlpiDashboard: React.FC = () => {
 
       {/* Ticket Volume Chart - Full Width */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-        <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Volumétrie des Tickets par Mois</h3>
-        <p className="text-[13px] text-[#94A3B8] mb-4">Volume mensuel de création de tickets</p>
+        <h3 className="text-[18px] font-semibold text-[#0F172A] mb-1">Volumétrie des Tickets par Mois</h3>
+        <p className="text-[15px] text-[#94A3B8] mb-4">Volume mensuel de création de tickets</p>
         <div className="h-72">
           <Chart options={volumeChartOptions} series={volumeChartSeries} type="bar" height="100%" />
         </div>
@@ -643,8 +643,8 @@ const GlpiDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Time Trends Chart - Incidents */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Incidents</h3>
-          <p className="text-[13px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
+          <h3 className="text-[18px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Incidents</h3>
+          <p className="text-[15px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
           <div className="h-72">
             <Chart options={createTimeChartOptions(incidentTimeTrends)} series={incidentChartSeries} type="area" height="100%" />
           </div>
@@ -652,8 +652,8 @@ const GlpiDashboard: React.FC = () => {
 
         {/* Time Trends Chart - Demandes */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-          <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Demandes</h3>
-          <p className="text-[13px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
+          <h3 className="text-[18px] font-semibold text-[#0F172A] mb-1">Évolution des Délais Moyens — Demandes</h3>
+          <p className="text-[15px] text-[#94A3B8] mb-4">Temps moyen de prise en charge et de clôture (heures)</p>
           <div className="h-72">
             <Chart options={createTimeChartOptions(demandTimeTrends)} series={demandChartSeries} type="area" height="100%" />
           </div>
@@ -663,8 +663,8 @@ const GlpiDashboard: React.FC = () => {
       {/* Detailed Performance Analysis Cards */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm space-y-6">
         <div>
-          <h3 className="text-[16px] font-semibold text-[#0F172A]">Rapport d'Analyse de Performance</h3>
-          <p className="text-[12px] text-[#94A3B8] mt-1">
+          <h3 className="text-[18px] font-semibold text-[#0F172A]">Rapport d'Analyse de Performance</h3>
+          <p className="text-[18px] text-[#94A3B8] mt-1">
             Analyse comparative approfondie basée sur les filtres actifs de la période.
           </p>
         </div>
@@ -677,10 +677,10 @@ const GlpiDashboard: React.FC = () => {
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-50 text-[#2B5BA8]">
                   <TrendingUp className="w-[18px] h-[18px]" />
                 </div>
-                <h4 className="text-[14px] font-bold text-[#0F172A]">1. Volume des Tickets</h4>
+                <h4 className="text-[18px] font-bold text-[#0F172A]">1. Volume des Tickets</h4>
               </div>
 
-              <div className="text-[13px] text-[#475569] space-y-3 leading-relaxed">
+              <div className="text-[15px] text-[#475569] space-y-3 leading-relaxed">
                 {volComp ? (
                   <p>
                     Le nombre de tickets est passé de <strong className="text-[#0F172A]">{volComp.prevTickets} en {volComp.prevMonthName}</strong> à{' '}
@@ -693,7 +693,7 @@ const GlpiDashboard: React.FC = () => {
                 )}
 
                 {volComp && (
-                  <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
+                  <div className={`px-2.5 py-1 rounded-md text-[15px] font-bold inline-flex items-center gap-1 ${
                     volComp.isDecrease ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-red-50 text-[#DC2626] border border-red-100'
                   }`}>
                     {volComp.isDecrease ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
@@ -704,12 +704,12 @@ const GlpiDashboard: React.FC = () => {
                 )}
 
                 {volComp && (
-                  <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                  <p className="text-[15px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
                     KPI : ({volComp.prevTickets} − {volComp.currentTickets}) ÷ {volComp.prevTickets} × 100 ≈ {volComp.pctChange}%
                   </p>
                 )}
                 
-                <p className="text-[12px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
+                <p className="text-[18px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
                   {volComp && volComp.isDecrease 
                     ? "C'est une amélioration importante : moins d'incidents signalés, meilleure stabilité ou efficacité corrective."
                     : "Une augmentation du volume peut signaler une mise en production récente ou un problème récurrent sur l'infrastructure."}
@@ -725,10 +725,10 @@ const GlpiDashboard: React.FC = () => {
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-amber-50 text-[#F59E0B]">
                   <Clock className="w-[18px] h-[18px]" />
                 </div>
-                <h4 className="text-[14px] font-bold text-[#0F172A]">2. Temps de Prise en Charge</h4>
+                <h4 className="text-[18px] font-bold text-[#0F172A]">2. Temps de Prise en Charge</h4>
               </div>
 
-              <div className="text-[13px] text-[#475569] space-y-3 leading-relaxed">
+              <div className="text-[15px] text-[#475569] space-y-3 leading-relaxed">
                 <p>
                   <strong>Time to Own = {kpiSummary.timeToOwn.toFixed(1)} heures</strong> en moyenne.
                 </p>
@@ -737,7 +737,7 @@ const GlpiDashboard: React.FC = () => {
                 </p>
 
                 {ownComp && (
-                  <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
+                  <div className={`px-2.5 py-1 rounded-md text-[15px] font-bold inline-flex items-center gap-1 ${
                     ownComp.isImprovement ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-amber-50 text-[#D97706] border border-amber-100'
                   }`}>
                     {ownComp.isImprovement ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
@@ -748,12 +748,12 @@ const GlpiDashboard: React.FC = () => {
                 )}
 
                 {ownComp && (
-                  <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                  <p className="text-[15px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
                     KPI : ({ownComp.prevOwn} − {ownComp.currentOwn}) ÷ {ownComp.prevOwn} × 100 ≈ {ownComp.pctChange}%
                   </p>
                 )}
 
-                <p className="text-[12px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
+                <p className="text-[18px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
                   {kpiSummary.timeToOwn < 12 
                     ? "Délai très court assurant aux utilisateurs une prise en compte rapide de leurs demandes."
                     : "Les délais d'attribution peuvent être optimisés par une répartition des ressources plus dynamique."}
@@ -769,10 +769,10 @@ const GlpiDashboard: React.FC = () => {
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-pink-50 text-[#E24A8D]">
                   <CheckCircle className="w-[18px] h-[18px]" />
                 </div>
-                <h4 className="text-[14px] font-bold text-[#0F172A]">3. Délais de Clôture</h4>
+                <h4 className="text-[18px] font-bold text-[#0F172A]">3. Délais de Clôture</h4>
               </div>
 
-              <div className="text-[13px] text-[#475569] space-y-3 leading-relaxed">
+              <div className="text-[15px] text-[#475569] space-y-3 leading-relaxed">
                 <p>
                   <strong>Time to Close = {kpiSummary.timeToClose.toFixed(1)} heures</strong> en moyenne.
                 </p>
@@ -780,12 +780,12 @@ const GlpiDashboard: React.FC = () => {
                   Écart moyen entre prise en charge et clôture : <strong className="text-[#0F172A]">{(kpiSummary.timeToClose - kpiSummary.timeToOwn).toFixed(1)} heures</strong>.
                 </p>
 
-                <p className="text-[11px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
+                <p className="text-[15px] font-mono text-[#64748B] bg-white border border-slate-100 rounded-md px-2.5 py-1.5">
                   KPI : {kpiSummary.timeToClose.toFixed(1)} h − {kpiSummary.timeToOwn.toFixed(1)} h = {(kpiSummary.timeToClose - kpiSummary.timeToOwn).toFixed(1)} h
                 </p>
 
                 {closeComp && (
-                  <div className={`px-2.5 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
+                  <div className={`px-2.5 py-1 rounded-md text-[15px] font-bold inline-flex items-center gap-1 ${
                     closeComp.isImprovement ? 'bg-emerald-50 text-[#059669] border border-emerald-100' : 'bg-amber-50 text-[#D97706] border border-amber-100'
                   }`}>
                     {closeComp.isImprovement ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
@@ -795,7 +795,7 @@ const GlpiDashboard: React.FC = () => {
                   </div>
                 )}
 
-                <p className="text-[12px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
+                <p className="text-[18px] italic text-[#64748B] bg-white border border-slate-100 p-2.5 rounded-lg">
                   Le temps de clôture global est influencé principalement par les demandes de service longues (validations, approvisionnements). Les incidents critiques et techniques restent résolus sous 2h.
                 </p>
               </div>
