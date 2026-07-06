@@ -25,7 +25,7 @@ const AgentAvailabilityCard: React.FC<AgentAvailabilityCardProps> = ({ agent }) 
       }}
     >
       {/* Server name */}
-      <p className="text-[14px] font-semibold text-[#0F172A] mb-2">
+      <p className="text-[18px] font-semibold text-[#0F172A] mb-2">
         {agent.host_name}
       </p>
 
@@ -38,7 +38,7 @@ const AgentAvailabilityCard: React.FC<AgentAvailabilityCardProps> = ({ agent }) 
       </p>
 
       {/* Label */}
-      <p className="text-[12px] text-[#94A3B8] mb-3">
+      <p className="text-[18px] text-[#94A3B8] mb-3">
         Zabbix Agent Availability — 30 days
       </p>
 

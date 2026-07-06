@@ -60,13 +60,13 @@ const KPICard: React.FC<KPICardProps> = ({
       {/* Card Header Layer */}
       <div className="flex items-start justify-between gap-4 mb-5 relative z-10">
         <div className="flex items-center gap-1.5 min-w-0">
-          <p className="text-[12px] font-bold tracking-wider uppercase text-slate-400 font-sans truncate">
+          <p className="text-[18px] font-bold tracking-wider uppercase text-slate-400 font-sans truncate">
             {title}
           </p>
           {tooltipText && (
             <div className="relative group/tooltip flex items-center shrink-0">
               <HelpCircle className="w-3.5 h-3.5 text-slate-300 hover:text-slate-400 transition-colors cursor-help" />
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[11px] font-medium rounded-md opacity-0 pointer-events-none transition-all duration-200 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 translate-y-1 shadow-md whitespace-nowrap z-30">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-900 text-white text-[15px] font-medium rounded-md opacity-0 pointer-events-none transition-all duration-200 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 translate-y-1 shadow-md whitespace-nowrap z-30">
                 {tooltipText}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
               </div>
@@ -99,7 +99,7 @@ const KPICard: React.FC<KPICardProps> = ({
           {/* Micro-UX Trend Badge */}
           {trend && (
             <div
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[11px] font-bold border font-sans tracking-wide shrink-0 transition-all duration-200 group-hover:scale-102"
+              className="flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[15px] font-bold border font-sans tracking-wide shrink-0 transition-all duration-200 group-hover:scale-102"
               style={{
                 backgroundColor: trend.isUp ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
                 borderColor: trend.isUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
@@ -118,7 +118,7 @@ const KPICard: React.FC<KPICardProps> = ({
 
         {/* Optional Contextual Description Meta Label */}
         {description && (
-          <div className="text-[12px] font-medium text-slate-400 font-sans tracking-normal border-t border-slate-100 pt-2.5 mt-0.5 flex items-center justify-between">
+          <div className="text-[18px] font-medium text-slate-400 font-sans tracking-normal border-t border-slate-100 pt-2.5 mt-0.5 flex items-center justify-between">
             <span className="truncate">{description}</span>
             <span className="w-1 h-1 rounded-full bg-slate-200 group-hover:bg-slate-300 transition-colors shrink-0 ml-2" />
           </div>

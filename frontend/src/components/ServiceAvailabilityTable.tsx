@@ -69,7 +69,7 @@ const StatusBadge: React.FC<{ currentState: string; incidentDays: number }> = ({
   const isRunning = status === 'running';
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium transition-all duration-200"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[18px] font-medium transition-all duration-200"
       style={{ 
         backgroundColor: config.bg, 
         color: config.text,
@@ -305,7 +305,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
           const d = new Date(value);
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0,3)}`;
         },
-        style: { colors: TEXT.label, fontSize: '11px' }
+        style: { colors: TEXT.label, fontSize: '15px' }
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -317,7 +317,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
       tickAmount: 1,
       labels: {
         formatter: (val) => val === 0 ? 'Running' : 'Problem',
-        style: { colors: TEXT.label, fontSize: '11px' }
+        style: { colors: TEXT.label, fontSize: '15px' }
       }
     },
     tooltip: {
@@ -364,15 +364,15 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
         <div>
           <h4 className="text-[15px] font-bold text-slate-800 mb-1">{parsedName.name}</h4>
           {parsedName.description && (
-            <p className="text-[12px] text-slate-400 mb-4">{parsedName.description}</p>
+            <p className="text-[18px] text-slate-400 mb-4">{parsedName.description}</p>
           )}
           
           <div className="grid grid-cols-2 lg:flex lg:flex-col gap-4">
             <div className="flex flex-col border-b border-slate-100 pb-2.5">
-              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Status</span>
+              <span className="text-slate-400 text-[15px] font-bold uppercase tracking-wider mb-1">Status</span>
               <div>
                 <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[18px] font-semibold"
                   style={{ backgroundColor: badgeConfig.bg, color: badgeConfig.text }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badgeConfig.dot }} />
@@ -382,8 +382,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
             </div>
             
             <div className="flex flex-col border-b border-slate-100 pb-2.5">
-              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Incidents (30d)</span>
-              <span className={`text-[14px] font-bold ${service.incident_days === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+              <span className="text-slate-400 text-[15px] font-bold uppercase tracking-wider mb-1">Incidents (30d)</span>
+              <span className={`text-[18px] font-bold ${service.incident_days === 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
                 {service.incident_days}
               </span>
               <span className="text-[10px] text-slate-400 mt-0.5">
@@ -392,8 +392,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
             </div>
 
             <div className="flex flex-col border-b border-slate-100 pb-2.5">
-              <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Last Incident</span>
-              <span className={`text-[13px] font-bold ${!service.last_incident ? 'text-emerald-500' : 'text-slate-700'}`}>
+              <span className="text-slate-400 text-[15px] font-bold uppercase tracking-wider mb-1">Last Incident</span>
+              <span className={`text-[15px] font-bold ${!service.last_incident ? 'text-emerald-500' : 'text-slate-700'}`}>
                 {formatLastIncident(service.last_incident)}
               </span>
             </div>
@@ -401,8 +401,8 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
         </div>
 
         <div className="mt-4 pt-3 border-t border-slate-100">
-          <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider block mb-0.5">Monitoring Scope</span>
-          <span className="text-[13px] font-semibold text-slate-700">
+          <span className="text-slate-400 text-[15px] font-bold uppercase tracking-wider block mb-0.5">Monitoring Scope</span>
+          <span className="text-[15px] font-semibold text-slate-700">
             {periodLabel}
           </span>
         </div>
@@ -426,7 +426,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
                 <button
                   key={days}
                   onClick={() => handlePresetClick(days)}
-                  className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all duration-205 ${
+                  className={`px-3 py-1 text-[15px] font-bold rounded-md transition-all duration-205 ${
                     activePreset === days
                       ? 'bg-slate-800 text-white shadow-xs'
                       : 'text-slate-400 hover:text-slate-700'
@@ -473,10 +473,10 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
             </div>
           ) : error ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-5">
-              <p className="text-slate-400 text-[13px] mb-2 font-medium">Unable to load chart data</p>
+              <p className="text-slate-400 text-[15px] mb-2 font-medium">Unable to load chart data</p>
               <button 
                 onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
-                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[12px] font-bold rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[18px] font-bold rounded-lg transition-colors"
               >
                 Retry
               </button>
@@ -493,7 +493,7 @@ const ExpandedServicePanel: React.FC<ExpandedServicePanelProps> = ({
         {/* Interpretation */}
         <div className="mt-4 flex items-start gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg">
           <InterpretationIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: interpretationColor }} />
-          <p className="text-[12px] text-slate-500 leading-relaxed">{interpretationText}</p>
+          <p className="text-[18px] text-slate-500 leading-relaxed">{interpretationText}</p>
         </div>
       </div>
     </div>
@@ -603,19 +603,19 @@ const ServerSection: React.FC<ServerSectionProps> = ({
         {/* Center Stats Badges (large screen) */}
         <div className="hidden sm:flex items-center gap-3">
           {stats.running > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[15px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
               <CheckCircle2 className="w-3.5 h-3.5" />
               {stats.running} Active
             </span>
           )}
           {stats.anomaly > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[15px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
               <AlertTriangle className="w-3.5 h-3.5 animate-pulse" />
               {stats.anomaly} Anomaly
             </span>
           )}
           {stats.stopped > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-100">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[15px] font-bold bg-red-50 text-red-700 border border-red-100">
               <XCircle className="w-3.5 h-3.5" />
               {stats.stopped} Critical
             </span>
@@ -643,11 +643,11 @@ const ServerSection: React.FC<ServerSectionProps> = ({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-150">
-                  <th className="pl-6 pr-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[36%]">Service Name</th>
-                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Current Status</th>
-                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Incidents (30D)</th>
-                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[18%]">Last Incident</th>
-                  <th className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">30-Day State Map</th>
+                  <th className="pl-6 pr-4 py-3 text-[15px] font-bold text-slate-500 uppercase tracking-wider w-[36%]">Service Name</th>
+                  <th className="px-4 py-3 text-[15px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Current Status</th>
+                  <th className="px-4 py-3 text-[15px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">Incidents (30D)</th>
+                  <th className="px-4 py-3 text-[15px] font-bold text-slate-500 uppercase tracking-wider w-[18%]">Last Incident</th>
+                  <th className="px-4 py-3 text-[15px] font-bold text-slate-500 uppercase tracking-wider w-[14%]">30-Day State Map</th>
                   <th className="pr-6 pl-2 py-3 w-[4%]"></th>
                 </tr>
               </thead>
@@ -703,7 +703,7 @@ const ServerSection: React.FC<ServerSectionProps> = ({
                         </td>
 
                         {/* Last Incident Column */}
-                        <td className="px-4 py-3.5 text-[12px] text-slate-500 font-medium font-sans">
+                        <td className="px-4 py-3.5 text-[18px] text-slate-500 font-medium font-sans">
                           {svc.last_incident ? (
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5 text-slate-350" />
@@ -868,8 +868,8 @@ const ServiceAvailabilityTable: React.FC<ServiceAvailabilityTableProps> = ({ dat
         <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
           <Activity className="w-6 h-6" />
         </div>
-        <p className="text-slate-800 text-[14px] font-bold mb-1">No service availability data</p>
-        <p className="text-slate-400 text-[12px]">Services will appear here when telemetry is received</p>
+        <p className="text-slate-800 text-[18px] font-bold mb-1">No service availability data</p>
+        <p className="text-slate-400 text-[18px]">Services will appear here when telemetry is received</p>
       </div>
     );
   }
@@ -881,7 +881,7 @@ const ServiceAvailabilityTable: React.FC<ServiceAvailabilityTableProps> = ({ dat
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 rounded-full bg-indigo-500" style={{ backgroundColor: BRAND.darkBlue }} />
           <h3 className="text-[15px] font-bold text-slate-800">Service Availability</h3>
-          <span className="text-[11px] text-slate-400 font-bold ml-1.5 bg-slate-100 px-2 py-0.5 rounded-full">
+          <span className="text-[15px] text-slate-400 font-bold ml-1.5 bg-slate-100 px-2 py-0.5 rounded-full">
             {totalServices} Monitored
           </span>
         </div>

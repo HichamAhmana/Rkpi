@@ -30,13 +30,13 @@ const TriggerSeverityChart: React.FC<TriggerSeverityChartProps> = ({ data }) => 
     xaxis: {
       categories: ['Disaster', 'High', 'Average', 'Warning', 'Info'],
       labels: {
-        style: { colors: '#94A3B8', fontSize: '12px' },
+        style: { colors: '#94A3B8', fontSize: '14px' },
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
     },
     yaxis: {
-      labels: { style: { colors: '#94A3B8', fontSize: '12px' } },
+      labels: { style: { colors: '#94A3B8', fontSize: '14px' } },
     },
     grid: {
       borderColor: '#F1F5F9',
@@ -61,8 +61,8 @@ const TriggerSeverityChart: React.FC<TriggerSeverityChartProps> = ({ data }) => 
       className="bg-white rounded-xl border border-[#E2E8F0] p-6 flex flex-col"
       style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' }}
     >
-      <h3 className="text-[16px] font-semibold text-[#0F172A] mb-1">Trigger Severity Breakdown</h3>
-      <p className="text-[13px] text-[#94A3B8] mb-4">Active triggers by severity level</p>
+      <h3 className="text-[18px] font-semibold text-[#0F172A] mb-1">Trigger Severity Breakdown</h3>
+      <p className="text-[15px] text-[#94A3B8] mb-4">Active triggers by severity level</p>
       <div className="flex-1 flex items-center justify-center min-h-[288px]">
         <Chart options={options} series={series} type="bar" height="100%" width="100%" />
       </div>

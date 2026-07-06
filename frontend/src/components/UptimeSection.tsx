@@ -281,7 +281,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
       min: 0,
       labels: {
         formatter: (val) => `${val.toFixed(0)}d`,
-        style: { colors: '#94A3B8', fontSize: '11px' }
+        style: { colors: '#94A3B8', fontSize: '15px' }
       }
     },
     annotations: {
@@ -384,7 +384,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-wide text-[#94A3B8] font-semibold">{metric.label}</p>
-                <p className="text-[13px] font-bold text-[#0F172A] truncate">{metric.value}</p>
+                <p className="text-[15px] font-bold text-[#0F172A] truncate">{metric.value}</p>
               </div>
             </div>
           ))}
@@ -395,14 +395,14 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
           {/* Chart Header */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 border-b border-[#F1F5F9] gap-3">
             <div>
-              <h4 className="text-[13px] font-semibold text-[#0F172A]">
+              <h4 className="text-[15px] font-semibold text-[#0F172A]">
                 Uptime History — {periodLabel}
               </h4>
               <div className="flex items-center gap-4 mt-1">
-                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                <span className="flex items-center gap-1.5 text-[15px] text-[#64748B]">
                   <span className="w-2 h-2 rounded-sm bg-[#2B5BA8]" /> Stable
                 </span>
-                <span className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+                <span className="flex items-center gap-1.5 text-[15px] text-[#64748B]">
                   <span className="w-2 h-2 rounded-sm bg-[#EF4444]" /> Restart
                 </span>
               </div>
@@ -415,7 +415,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
                   <button
                     key={days}
                     onClick={() => handlePresetClick(days)}
-                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 ${
+                    className={`px-2.5 py-1 text-[15px] font-medium rounded-md transition-all duration-200 ${
                       activePreset === days
                         ? 'bg-[#2B5BA8] text-white shadow-sm'
                         : 'text-[#64748B] hover:bg-white hover:shadow-sm'
@@ -429,7 +429,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
               <div className="w-px h-5 bg-[#E2E8F0]" />
 
               <select
-                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[15px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
                 value={selectedYear || ''}
                 onChange={handleYearChange}
               >
@@ -440,7 +440,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
               </select>
 
               <select
-                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
+                className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[15px] rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#2B5BA8] cursor-pointer"
                 value={selectedMonth || ''}
                 onChange={handleMonthChange}
                 disabled={!selectedYear}
@@ -459,22 +459,22 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
               <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-6 h-6 border-2 border-[#2B5BA8] border-t-transparent rounded-full animate-spin" />
-                  <span className="text-[11px] text-[#94A3B8]">Loading chart data...</span>
+                  <span className="text-[15px] text-[#94A3B8]">Loading chart data...</span>
                 </div>
               </div>
             ) : error ? (
               <div className="w-full h-full flex flex-col items-center justify-center">
-                <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
+                <p className="text-[#94A3B8] text-[15px] mb-2">Unable to load chart data</p>
                 <button 
                   onClick={() => setCustomHistoryCache(prev => { const next = {...prev}; delete next[currentSelectionParams!.key]; return next; })}
-                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded-md hover:bg-[#E2E8F0] transition-colors"
+                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[18px] font-medium rounded-md hover:bg-[#E2E8F0] transition-colors"
                 >
                   Retry
                 </button>
               </div>
             ) : chartData.length === 0 ? (
               <div className="w-full h-full flex items-center justify-center">
-                <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
+                <p className="text-[#94A3B8] text-[15px]">No data available for this period</p>
               </div>
             ) : (
               <Chart options={chartOptions} series={series} type="bar" width="100%" height="100%" />
@@ -485,7 +485,7 @@ const ExpandedUptimePanel: React.FC<ExpandedUptimePanelProps> = ({
         {/* Interpretation */}
         <div className="mt-3 flex items-start gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg">
           <InterpretationIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: interpretationColor }} />
-          <p className="text-[12px] text-[#475569] leading-relaxed">{interpretationText}</p>
+          <p className="text-[18px] text-[#475569] leading-relaxed">{interpretationText}</p>
         </div>
       </div>
     </div>
@@ -571,7 +571,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
               <Server className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex items-center gap-2.5">
-              <h3 className="text-[16px] font-bold text-[#0F172A] truncate">{stat.host}</h3>
+              <h3 className="text-[18px] font-bold text-[#0F172A] truncate">{stat.host}</h3>
               <span
                 className="inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: statusBg, color: statusColor }}
@@ -614,17 +614,17 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
               <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
                 {uptime.days}
               </span>
-              <span className="text-[11px] font-bold text-[#94A3B8] mr-2">d</span>
+              <span className="text-[15px] font-bold text-[#94A3B8] mr-2">d</span>
               <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
                 {uptime.hours}
               </span>
-              <span className="text-[11px] font-bold text-[#94A3B8] mr-2">h</span>
+              <span className="text-[15px] font-bold text-[#94A3B8] mr-2">h</span>
               <span className="text-[24px] font-extrabold text-[#0F172A] tabular-nums leading-none">
                 {uptime.minutes}
               </span>
-              <span className="text-[11px] font-bold text-[#94A3B8]">m</span>
+              <span className="text-[15px] font-bold text-[#94A3B8]">m</span>
             </div>
-            <p className="text-[11px] text-[#94A3B8]">{bootDateStr}</p>
+            <p className="text-[15px] text-[#94A3B8]">{bootDateStr}</p>
             {/* Calculation explanation */}
             <p className="text-[10px] text-label mt-1">
               Ring {Math.round(uptimePercent)}% = current uptime ÷ 30 days × 100
@@ -644,7 +644,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
               className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]"
             >
               <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">{pill.label}</span>
-              <span className={`text-[12px] font-extrabold ${pill.danger ? 'text-[#EF4444]' : 'text-[#0F172A]'} truncate w-full text-center`}>
+              <span className={`text-[18px] font-extrabold ${pill.danger ? 'text-[#EF4444]' : 'text-[#0F172A]'} truncate w-full text-center`}>
                 {pill.value}
               </span>
             </div>
@@ -688,7 +688,7 @@ const UptimeSection: React.FC<UptimeSectionProps> = ({ data }) => {
       <div className="flex items-center gap-2 mb-5">
         <div className="w-1 h-5 rounded-full bg-[#2B5BA8]" />
         <h3 className="text-[15px] font-semibold text-[#0F172A]">Server Uptime</h3>
-        <span className="text-[11px] text-[#94A3B8] font-medium ml-1">
+        <span className="text-[15px] text-[#94A3B8] font-medium ml-1">
           {data.length} {data.length === 1 ? 'server' : 'servers'}
         </span>
       </div>

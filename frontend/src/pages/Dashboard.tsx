@@ -146,12 +146,12 @@ const Dashboard: React.FC = () => {
             <WifiOff className="w-7 h-7 text-[#EF4444]" />
           </div>
           <h2 className="text-[18px] font-semibold text-[#0F172A] mb-2">Unable to Load Data</h2>
-          <p className="text-[14px] text-[#94A3B8] mb-6">
+          <p className="text-[18px] text-[#94A3B8] mb-6">
             {error || 'Incomplete data received from the server.'}
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2.5 rounded-lg text-[14px] font-medium text-white transition-colors duration-150"
+            className="px-5 py-2.5 rounded-lg text-[18px] font-medium text-white transition-colors duration-150"
             style={{ backgroundColor: '#2B5BA8' }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2563B0')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2B5BA8')}

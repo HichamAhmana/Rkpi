@@ -232,7 +232,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
       min: 0,
       labels: {
         formatter: (val: number) => `${val.toFixed(0)}d`,
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
       },
     },
     annotations: {
@@ -307,23 +307,23 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
         <div className="w-full md:w-[30%] flex flex-col gap-3">
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Current uptime</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
+            <span className="text-[#94A3B8] text-[18px] mb-1">Current uptime</span>
+            <span className="text-[18px] font-bold text-[#0F172A]">
               {formatUptimeFull(stat.current_uptime_seconds)}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Boot date</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">
+            <span className="text-[#94A3B8] text-[18px] mb-1">Boot date</span>
+            <span className="text-[18px] font-bold text-[#0F172A]">
               {formatBootDate(stat.current_uptime_seconds)}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Restarts (30d)</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Restarts (30d)</span>
             <span
-              className="text-[14px] font-bold"
+              className="text-[18px] font-bold"
               style={{ color: stat.restart_count > 0 ? '#EF4444' : '#3DBE7A' }}
             >
               {stat.restart_count}
@@ -331,9 +331,9 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Last restart</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Last restart</span>
             <span
-              className="text-[14px] font-bold"
+              className="text-[18px] font-bold"
               style={{ color: stat.last_restart_time ? '#0F172A' : '#3DBE7A' }}
             >
               {formatLastRestart(stat.last_restart_time)}
@@ -341,19 +341,19 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Total ports</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">{stat.total_ports}</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Total ports</span>
+            <span className="text-[18px] font-bold text-[#0F172A]">{stat.total_ports}</span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Ports up</span>
-            <span className="text-[14px] font-bold text-[#3DBE7A]">{stat.up_ports}</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Ports up</span>
+            <span className="text-[18px] font-bold text-[#3DBE7A]">{stat.up_ports}</span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Ports down</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Ports down</span>
             <span
-              className="text-[14px] font-bold"
+              className="text-[18px] font-bold"
               style={{ color: stat.down_ports > 0 ? '#EF4444' : '#3DBE7A' }}
             >
               {stat.down_ports}
@@ -361,8 +361,8 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Monitoring period</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">{periodLabel}</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Monitoring period</span>
+            <span className="text-[18px] font-bold text-[#0F172A]">{periodLabel}</span>
           </div>
         </div>
 
@@ -371,10 +371,10 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
           {/* Header + time selector */}
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
             <div>
-              <h4 className="text-[14px] font-semibold text-[#0F172A] mb-0.5">
+              <h4 className="text-[18px] font-semibold text-[#0F172A] mb-0.5">
                 {stat.switch_name} — Uptime History
               </h4>
-              <p className="text-[12px] text-[#94A3B8]">
+              <p className="text-[18px] text-[#94A3B8]">
                 Blue = stable · Red = restart detected
               </p>
             </div>
@@ -387,7 +387,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
                     <button
                       key={days}
                       onClick={() => handlePresetClick(days)}
-                      className={`px-3 py-1 text-[12px] font-medium rounded-md transition-colors ${
+                      className={`px-3 py-1 text-[18px] font-medium rounded-md transition-colors ${
                         activePreset === days
                           ? 'bg-[#2563B0] text-white shadow-sm'
                           : 'text-[#64748B] hover:bg-[#E2E8F0]'
@@ -402,7 +402,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
 
                 <div className="flex items-center gap-2">
                   <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2563B0] cursor-pointer"
+                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[18px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2563B0] cursor-pointer"
                     value={selectedYear || ''}
                     onChange={handleYearChange}
                   >
@@ -411,7 +411,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
                   </select>
 
                   <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2563B0] cursor-pointer"
+                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[18px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#2563B0] cursor-pointer"
                     value={selectedMonth || ''}
                     onChange={handleMonthChange}
                     disabled={!selectedYear}
@@ -424,7 +424,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
                 </div>
               </div>
 
-              <span className="text-[11px] font-medium text-[#2563B0] bg-[rgba(37,99,176,0.1)] px-2 py-0.5 rounded-full">
+              <span className="text-[15px] font-medium text-[#2563B0] bg-[rgba(37,99,176,0.1)] px-2 py-0.5 rounded-full">
                 {activePreset
                   ? `Showing last ${activePreset} days from today`
                   : selectedYear && selectedMonth
@@ -442,7 +442,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
               </div>
             ) : error ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-                <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
+                <p className="text-[#94A3B8] text-[15px] mb-2">Unable to load chart data</p>
                 <button
                   onClick={() =>
                     setCustomHistoryCache((prev) => {
@@ -451,14 +451,14 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
                       return next;
                     })
                   }
-                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
+                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[18px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
                 >
                   Retry
                 </button>
               </div>
             ) : chartData.length === 0 ? (
               <div className="w-full h-full flex items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-                <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
+                <p className="text-[#94A3B8] text-[15px]">No data available for this period</p>
               </div>
             ) : (
               <Chart options={chartOptions} series={series} type="bar" width="100%" height="100%" />
@@ -467,7 +467,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
 
           {/* Interpretation panel */}
           <div
-            className="mt-4 p-4 rounded-md border text-[13px] text-[#475569]"
+            className="mt-4 p-4 rounded-md border text-[15px] text-[#475569]"
             style={{
               borderLeft: '4px solid #2563B0',
               backgroundColor: '#F8FAFC',
@@ -475,7 +475,7 @@ const ExpandedSwitchPanel: React.FC<ExpandedSwitchPanelProps> = ({
               borderLeftColor: '#2563B0',
             }}
           >
-            <div className="text-[13px] font-semibold text-[#0F172A] mb-2">KPI Interpretation</div>
+            <div className="text-[15px] font-semibold text-[#0F172A] mb-2">KPI Interpretation</div>
             <div className="space-y-1">
               <p>{interpretLine1}</p>
               <p>{interpretLine2}</p>
@@ -541,8 +541,8 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
               <Network className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[16px] font-bold text-[#0F172A] truncate">{stat.switch_name}</h3>
-              <p className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">Network Switch</p>
+              <h3 className="text-[18px] font-bold text-[#0F172A] truncate">{stat.switch_name}</h3>
+              <p className="text-[15px] text-[#94A3B8] font-medium uppercase tracking-wider">Network Switch</p>
             </div>
           </div>
           
@@ -575,7 +575,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
           <div className="text-[24px] font-extrabold text-[#0F172A] mb-0.5 leading-none">
             {formatUptimeFull(stat.current_uptime_seconds)}
           </div>
-          <div className="text-[11px] text-[#94A3B8]">
+          <div className="text-[15px] text-[#94A3B8]">
             Since {formatBootDateShort(stat.current_uptime_seconds)}
           </div>
         </div>
@@ -584,7 +584,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
         <div className="bg-[#F8FAFC] border border-[#F1F5F9] p-3.5 rounded-xl">
           <div className="flex justify-between items-center mb-1.5">
             <span className="text-[10px] uppercase tracking-wider text-[#94A3B8] font-bold">Port Connectivity</span>
-            <span className="text-[12px] font-extrabold text-[#0F172A]">
+            <span className="text-[18px] font-extrabold text-[#0F172A]">
               {stat.up_ports}/{stat.total_ports} ports &middot; {portPct}%
             </span>
           </div>
@@ -633,7 +633,7 @@ const SwitchCard: React.FC<SwitchCardProps> = ({
             >
               <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">{pill.label}</span>
               <span 
-                className="text-[12px] font-extrabold truncate w-full text-center"
+                className="text-[18px] font-extrabold truncate w-full text-center"
                 style={{ color: pill.color }}
               >
                 {pill.value}
@@ -675,10 +675,10 @@ const SwitchUptimeSection: React.FC<SwitchUptimeSectionProps> = ({ data, isLoadi
     return (
       <div className="w-full">
         <div className="mb-4">
-          <h3 className="text-[16px] font-semibold text-[#0F172A]">
+          <h3 className="text-[18px] font-semibold text-[#0F172A]">
             Network Switches — Uptime &amp; Availability
           </h3>
-          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+          <p className="text-[15px] text-[#94A3B8] mt-0.5">
             All 6 switches monitored via SNMP
           </p>
         </div>
@@ -704,10 +704,10 @@ const SwitchUptimeSection: React.FC<SwitchUptimeSectionProps> = ({ data, isLoadi
     <div className="w-full">
       {/* Section header */}
       <div className="mb-4">
-        <h3 className="text-[16px] font-semibold text-[#0F172A]">
+        <h3 className="text-[18px] font-semibold text-[#0F172A]">
           Network Switches — Uptime &amp; Availability
         </h3>
-        <p className="text-[13px] text-[#94A3B8] mt-0.5">
+        <p className="text-[15px] text-[#94A3B8] mt-0.5">
           All 6 switches monitored via SNMP
         </p>
       </div>

@@ -230,7 +230,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
           const d = new Date(Number(value));
           return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].substring(0, 3)}`;
         },
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
       },
       axisBorder: { show: false },
       axisTicks: { show: false },
@@ -246,7 +246,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
           if (val === 2) return 'Down';
           return '';
         },
-        style: { colors: '#94A3B8', fontSize: '11px' },
+        style: { colors: '#94A3B8', fontSize: '15px' },
       },
     },
     annotations: {
@@ -260,7 +260,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
         const statusStr = d.y === 1 ? 'Up' : d.y === 2 ? 'Down' : '—';
         const statusColor = d.y === 1 ? '#3DBE7A' : '#EF4444';
         return `
-          <div class="px-3 py-2 bg-white shadow-lg rounded border border-[#E2E8F0] text-[12px] text-[#0F172A]">
+          <div class="px-3 py-2 bg-white shadow-lg rounded border border-[#E2E8F0] text-[18px] text-[#0F172A]">
             <div class="font-bold mb-1">${dayStr}</div>
             <div>
               <span class="font-semibold text-[#64748B]">Status: </span>
@@ -303,52 +303,52 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
         {/* Left side — Stats summary (30%) */}
         <div className="w-full md:w-[30%] flex flex-col gap-3">
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Current status</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Current status</span>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: currentStatusDot }} />
-              <span className="text-[14px] font-semibold text-[#0F172A]">{currentStatusLabel}</span>
+              <span className="text-[18px] font-semibold text-[#0F172A]">{currentStatusLabel}</span>
             </div>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Last value</span>
-            <span className="text-[14px] font-bold" style={{ color: valueColor(lastValue) }}>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Last value</span>
+            <span className="text-[18px] font-bold" style={{ color: valueColor(lastValue) }}>
               {lastValue !== null ? `${lastValue} (${currentStatusLabel})` : '—'}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Min (30d)</span>
-            <span className="text-[14px] font-bold" style={{ color: valueColor(minValue) }}>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Min (30d)</span>
+            <span className="text-[18px] font-bold" style={{ color: valueColor(minValue) }}>
               {minValue !== null ? `${minValue} (${valueLabel(minValue)})` : '—'}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Avg (30d)</span>
-            <span className="text-[14px] font-bold" style={{ color: avgColor(avgValue) }}>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Avg (30d)</span>
+            <span className="text-[18px] font-bold" style={{ color: avgColor(avgValue) }}>
               {avgValue !== null ? Number(avgValue).toFixed(4) : '—'}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Max (30d)</span>
-            <span className="text-[14px] font-bold" style={{ color: valueColor(maxValue) }}>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Max (30d)</span>
+            <span className="text-[18px] font-bold" style={{ color: valueColor(maxValue) }}>
               {maxValue !== null ? `${maxValue} (${valueLabel(maxValue)})` : '—'}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Flap count (30d)</span>
-            <span className="text-[14px] font-bold" style={{ color: flapsColor(downCount) }}>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Flap count (30d)</span>
+            <span className="text-[18px] font-bold" style={{ color: flapsColor(downCount) }}>
               {downCount}
             </span>
           </div>
 
           <div className="flex flex-col border-b border-[#E2E8F0] pb-3">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Last down</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Last down</span>
             <span
-              className="text-[14px] font-bold"
+              className="text-[18px] font-bold"
               style={{ color: stat.last_down ? '#0F172A' : '#3DBE7A' }}
             >
               {formatLastDown(stat.last_down)}
@@ -356,8 +356,8 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[#94A3B8] text-[12px] mb-1">Monitoring period</span>
-            <span className="text-[14px] font-bold text-[#0F172A]">{periodLabel}</span>
+            <span className="text-[#94A3B8] text-[18px] mb-1">Monitoring period</span>
+            <span className="text-[18px] font-bold text-[#0F172A]">{periodLabel}</span>
           </div>
         </div>
 
@@ -366,10 +366,10 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
           {/* Header + Time Selector */}
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
             <div>
-              <h4 className="text-[14px] font-semibold text-[#0F172A] mb-0.5">
+              <h4 className="text-[18px] font-semibold text-[#0F172A] mb-0.5">
                 Port {portNum} — Status History
               </h4>
-              <p className="text-[12px] text-[#94A3B8]">
+              <p className="text-[18px] text-[#94A3B8]">
                 1 = Up · 2 = Down · Flat green line = perfectly stable
               </p>
             </div>
@@ -382,7 +382,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
                     <button
                       key={days}
                       onClick={() => handlePresetClick(days)}
-                      className={`px-3 py-1 text-[12px] font-medium rounded-md transition-colors ${
+                      className={`px-3 py-1 text-[18px] font-medium rounded-md transition-colors ${
                         activePreset === days
                           ? 'bg-[#6B8FD4] text-white shadow-sm'
                           : 'text-[#64748B] hover:bg-[#E2E8F0]'
@@ -397,7 +397,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
 
                 <div className="flex items-center gap-2">
                   <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6B8FD4] cursor-pointer"
+                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[18px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6B8FD4] cursor-pointer"
                     value={selectedYear || ''}
                     onChange={handleYearChange}
                   >
@@ -408,7 +408,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
                   </select>
 
                   <select
-                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[12px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6B8FD4] cursor-pointer"
+                    className="bg-white border border-[#E2E8F0] text-[#0F172A] text-[18px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6B8FD4] cursor-pointer"
                     value={selectedMonth || ''}
                     onChange={handleMonthChange}
                     disabled={!selectedYear}
@@ -421,7 +421,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
                 </div>
               </div>
 
-              <span className="text-[11px] font-medium text-[#6B8FD4] bg-[rgba(107,143,212,0.1)] px-2 py-0.5 rounded-full">
+              <span className="text-[15px] font-medium text-[#6B8FD4] bg-[rgba(107,143,212,0.1)] px-2 py-0.5 rounded-full">
                 {activePreset
                   ? `Showing last ${activePreset} days from today`
                   : selectedYear && selectedMonth
@@ -439,7 +439,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
               </div>
             ) : error ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-                <p className="text-[#94A3B8] text-[13px] mb-2">Unable to load chart data</p>
+                <p className="text-[#94A3B8] text-[15px] mb-2">Unable to load chart data</p>
                 <button
                   onClick={() =>
                     setCustomHistoryCache((prev) => {
@@ -448,14 +448,14 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
                       return next;
                     })
                   }
-                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[12px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
+                  className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] text-[18px] font-medium rounded hover:bg-[#E2E8F0] transition-colors"
                 >
                   Retry
                 </button>
               </div>
             ) : chartData.length === 0 ? (
               <div className="w-full h-full flex items-center justify-center bg-white border border-[#E2E8F0] rounded-lg">
-                <p className="text-[#94A3B8] text-[13px]">No data available for this period</p>
+                <p className="text-[#94A3B8] text-[15px]">No data available for this period</p>
               </div>
             ) : (
               <Chart options={chartOptions} series={series} type="area" width="100%" height="100%" />
@@ -464,7 +464,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
 
           {/* Interpretation panel — below chart */}
           <div
-            className="mt-4 p-4 rounded-md border text-[13px] text-[#475569]"
+            className="mt-4 p-4 rounded-md border text-[15px] text-[#475569]"
             style={{
               borderLeft: '4px solid #6B8FD4',
               backgroundColor: '#F8FAFC',
@@ -472,7 +472,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
               borderLeftColor: '#6B8FD4',
             }}
           >
-            <div className="text-[13px] font-semibold text-[#0F172A] mb-2">KPI Interpretation</div>
+            <div className="text-[15px] font-semibold text-[#0F172A] mb-2">KPI Interpretation</div>
             <div className="space-y-1">
               <p>{interpretationBullet1}</p>
               <p>{interpretationBullet2}</p>
@@ -561,8 +561,8 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
               <Link2 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-[16px] font-bold text-[#0F172A]">SFP Port {portNum}</h3>
-              <p className="text-[11px] text-[#94A3B8] font-medium uppercase tracking-wider">SW-1 Fibre Uplink</p>
+              <h3 className="text-[18px] font-bold text-[#0F172A]">SFP Port {portNum}</h3>
+              <p className="text-[15px] text-[#94A3B8] font-medium uppercase tracking-wider">SW-1 Fibre Uplink</p>
             </div>
           </div>
 
@@ -619,7 +619,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
             </div>
             <div className="min-w-0">
               <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider">Fibre Optic Link</div>
-              <div className="text-[14px] font-extrabold text-[#0F172A] mt-0.5 truncate">
+              <div className="text-[18px] font-extrabold text-[#0F172A] mt-0.5 truncate">
                 {avgValue !== null ? `${(avgValue * 100).toFixed(2)}%` : '—'} Average Uptime
               </div>
             </div>
@@ -637,7 +637,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
           <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
             <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">LINK STATE</span>
             <span 
-              className="text-[12px] font-extrabold truncate w-full text-center"
+              className="text-[18px] font-extrabold truncate w-full text-center"
               style={{ color: valueColor(lastValue) }}
             >
               {valueLabel(lastValue)}
@@ -648,7 +648,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
           <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
             <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">LINK FLAPS</span>
             <span 
-              className="text-[12px] font-extrabold truncate w-full text-center"
+              className="text-[18px] font-extrabold truncate w-full text-center"
               style={{ color: downCount > 0 ? '#EF4444' : '#3DBE7A' }}
             >
               {downCount}
@@ -658,7 +658,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
           {/* Min/Max Status */}
           <div className="flex flex-col items-center py-2 px-2 bg-[#F8FAFC] rounded-lg border border-[#F1F5F9]">
             <span className="text-[8px] uppercase tracking-wider text-[#94A3B8] font-bold mb-1 text-center truncate w-full">MIN / MAX</span>
-            <span className="text-[11px] font-extrabold text-[#0F172A] truncate w-full text-center">
+            <span className="text-[15px] font-extrabold text-[#0F172A] truncate w-full text-center">
               {valueLabel(minValue)} / {valueLabel(maxValue)}
             </span>
           </div>
@@ -716,8 +716,8 @@ const SfpPortsSection: React.FC<SfpPortsSectionProps> = ({ data, isLoading = fal
     return (
       <div className="w-full">
         <div className="mb-4">
-          <h3 className="text-[16px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
-          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+          <h3 className="text-[18px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
+          <p className="text-[15px] text-[#94A3B8] mt-0.5">
             Ports 49 · 50 · 51 — Fibre uplink monitoring
           </p>
         </div>
@@ -743,8 +743,8 @@ const SfpPortsSection: React.FC<SfpPortsSectionProps> = ({ data, isLoading = fal
     <div className="w-full">
       {/* Section header */}
       <div className="mb-4">
-        <h3 className="text-[16px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
-        <p className="text-[13px] text-[#94A3B8] mt-0.5">
+        <h3 className="text-[18px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
+        <p className="text-[15px] text-[#94A3B8] mt-0.5">
           Ports 49 · 50 · 51 — Fibre uplink monitoring
         </p>
       </div>

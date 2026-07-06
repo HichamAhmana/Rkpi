@@ -31,14 +31,14 @@ const Navbar: React.FC<NavbarProps> = ({ pageTitle = 'Dashboard', onMenuToggle, 
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="text-[13px] text-[#94A3B8] hidden sm:block">
+        <span className="text-[15px] text-[#94A3B8] hidden sm:block">
           Last updated: {formatTimestamp(lastUpdated)}
         </span>
         {onLogout && (
           <button
             onClick={onLogout}
             title="Se déconnecter"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[#64748B] hover:text-[#DC2626] hover:bg-red-50 transition-colors border border-[#E2E8F0] hover:border-red-100"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[18px] font-medium text-[#64748B] hover:text-[#DC2626] hover:bg-red-50 transition-colors border border-[#E2E8F0] hover:border-red-100"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Déconnexion</span>
