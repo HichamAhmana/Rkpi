@@ -2,6 +2,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Vite bakes VITE_ vars in at build time; .env is excluded from the build
+# context, so it must be passed in explicitly (see docker-compose.prod.yml).
+ARG VITE_SENTRY_DSN
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+
 COPY package*.json ./
 RUN npm ci
 

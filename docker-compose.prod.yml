@@ -4,6 +4,10 @@
 #
 # backend/.env must point at the real Zabbix/GLPI databases (not the local
 # dev mirrors in docker-compose.yml) and set CORS_ORIGIN to this app's public URL.
+#
+# VITE_SENTRY_DSN (frontend build arg) is read from a .env file next to this
+# compose file (repo root) — Vite bakes it into the JS bundle at build time,
+# so it must be set *before* `docker compose build`, not just at runtime.
 services:
   backend:
     build:
@@ -18,6 +22,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     container_name: rkpi_frontend
     restart: unless-stopped
     depends_on:

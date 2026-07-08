@@ -29,6 +29,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.3",
     "@nestjs/typeorm": "^11.0.1",
+    "@sentry/nestjs": "^10.63.0",
     "cache-manager": "^7.2.9",
     "mysql2": "^3.22.5",
     "nodemailer": "^9.0.1",

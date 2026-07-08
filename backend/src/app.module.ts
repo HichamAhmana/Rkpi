@@ -3,12 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule } from '@nestjs/cache-manager';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { ZabbixModule } from './zabbix/zabbix.module';
 import { GlpiModule } from './modules/glpi/glpi.module';
 import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { HealthModule } from './health/health.module';
 
 // GLPI's database may not be reachable yet (e.g. it lives on a VM that isn't
 // set up). Skip registering its connection entirely rather than crashing the
@@ -17,6 +19,7 @@ const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     CacheModule.register({ isGlobal: true, ttl: 60_000, max: 200 }),
     ScheduleModule.forRoot(),
@@ -61,7 +64,11 @@ const glpiEnabled = Boolean(process.env.DB_GLPI_HOST);
     ...(glpiEnabled ? [GlpiModule] : []),
     EmailModule,
     AuthModule,
+    HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}
