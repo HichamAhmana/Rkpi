@@ -521,13 +521,7 @@ const PdfReport: React.FC = () => {
                   <td className={TDB}>{row.server}</td>
                   <td className={TDR}>{row.indicator}</td>
                   <td className={TDR}>
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold"
-                      style={{
-                        backgroundColor: row.ok ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)',
-                        color: row.ok ? '#059669' : '#DC2626',
-                      }}
-                    >
+                    <span className="inline-flex items-center gap-1">
                       {row.ok ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                       {row.value}
                     </span>
