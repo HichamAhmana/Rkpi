@@ -1,11 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  FileText, Mail, Download, Loader2, AlertCircle, CheckCircle,
+  FileText, Loader2, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { BRAND } from '../styles/colors';
 import logoImg from '../../assets/logo.png';
 import {
@@ -17,8 +15,6 @@ import {
   getGlpiKpiSummary,
   getGlpiTicketVolume,
   getGlpiTimeTrends,
-  sendReportByEmail,
-  getZabbixReportCharts,
 } from '../services/api';
 import type {
   ServerServices,
@@ -29,66 +25,7 @@ import type {
   GlpiKpiSummary,
   GlpiTicketVolume,
   GlpiTimeTrends,
-  ZabbixReportCharts,
-  ChartDayRaw,
-  AgentChartDay,
 } from '../services/api';
-
-// ─── Gradient transparent→white pre-processor ─────────────────────────────────
-// html2canvas renders `transparent` as opaque black inside gradients.
-// This patches every inline background that contains `transparent` to use
-// rgba(255,255,255,0) instead, then restores the originals after capture.
-function fixGradientTransparents(root: HTMLElement): () => void {
-  type Saved = { el: HTMLElement; prop: 'background' | 'backgroundImage'; was: string };
-  const saved: Saved[] = [];
-  [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))].forEach(el => {
-    (['background', 'backgroundImage'] as const).forEach(prop => {
-      const val = el.style[prop];
-      if (val && val.includes('transparent')) {
-        saved.push({ el, prop, was: val });
-        (el.style as unknown as Record<string, string>)[prop] = val.replace(/\btransparent\b/g, 'rgba(255,255,255,0)');
-      }
-    });
-  });
-  return () => saved.forEach(({ el, prop, was }) => { (el.style as unknown as Record<string, string>)[prop] = was; });
-}
-
-// ─── Oklab→RGB pre-processor ──────────────────────────────────────────────────
-function convertOklabColors(root: HTMLElement): () => void {
-  const off = document.createElement('canvas');
-  off.width = off.height = 1;
-  const ctx = off.getContext('2d', { willReadFrequently: true })!;
-  const toRgb = (color: string): string | null => {
-    if (!color || (!color.includes('oklab') && !color.includes('oklch') && !color.includes('color('))) return null;
-    try {
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = color;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-      return a < 255 ? `rgba(${r},${g},${b},${(a / 255).toFixed(3)})` : `rgb(${r},${g},${b})`;
-    } catch { return null; }
-  };
-  const PROPS = ['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'caretColor'] as const;
-  type Saved = { el: HTMLElement; prop: string; was: string };
-  const saved: Saved[] = [];
-  [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))].forEach(el => {
-    const cs = window.getComputedStyle(el);
-    PROPS.forEach(prop => {
-      const val = cs[prop] as string;
-      const rgb = toRgb(val);
-      if (rgb) { saved.push({ el, prop, was: el.style[prop] ?? '' }); el.style[prop] = rgb; }
-    });
-  });
-  return () => saved.forEach(({ el, prop, was }) => { (el.style as unknown as Record<string, string>)[prop] = was; });
-}
-
-// ─── Safe hex→rgba for PDF-safe inline styles (avoids 8-digit hex alpha) ──────
-const hexRgba = (hex: string, alpha: number): string => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-};
 
 // ─── Module-level date constants ───────────────────────────────────────────────
 const _now = new Date();
@@ -99,13 +36,6 @@ const periodTo = _now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-di
 const currentMonth = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-const formatUptime = (seconds: number): string => {
-  if (!seconds || seconds < 0) return '—';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  return d > 0 ? `${d}j ${h}h` : h > 0 ? `${h}h` : `${Math.floor((seconds % 3600) / 60)}m`;
-};
-
 const formatUptimeWeeks = (seconds: number): string => {
   if (!seconds || seconds < 0) return '—';
   return `${(seconds / (7 * 86400)).toFixed(2)} semaines`;
@@ -133,7 +63,15 @@ const formatMonthFrLong = (val: string): string => {
   return `${names[month] || month} ${year}`;
 };
 
-// ─── Table style constants (matching PDF's dark navy headers) ──────────────────
+// ─── Safe hex→rgba for inline styles (avoids 8-digit hex alpha) ───────────────
+const hexRgba = (hex: string, alpha: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+// ─── Table style constants (matching dark navy headers) ────────────────────────
 const NAVY = '#1B3A6B';
 const THN = 'text-white text-left px-3 py-2.5 text-[11px] font-bold tracking-wide';
 const TDR = 'px-3 py-2.5 text-[12px] text-[#334155] border border-[#E2E8F0]';
@@ -170,13 +108,7 @@ const SubTitle: React.FC<{ text: string }> = ({ text }) => (
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 const PdfReport: React.FC = () => {
-  const reportRef = useRef<HTMLDivElement>(null);
-
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
-  const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [sending, setSending] = useState(false);
-  const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const [serviceData, setServiceData] = useState<ServerServices[]>([]);
   const [agentData, setAgentData] = useState<AgentStat[]>([]);
@@ -187,7 +119,6 @@ const PdfReport: React.FC = () => {
   const [glpiVolume, setGlpiVolume] = useState<GlpiTicketVolume[]>([]);
   const [glpiIncidentTrends, setGlpiIncidentTrends] = useState<GlpiTimeTrends | null>(null);
   const [glpiDemandTrends, setGlpiDemandTrends] = useState<GlpiTimeTrends | null>(null);
-  const [reportCharts, setReportCharts] = useState<ZabbixReportCharts | null>(null);
   // The month actually used for the KPI section (falls back to latest month with data)
   const [reportMonth, setReportMonth] = useState(currentMonth);
 
@@ -196,7 +127,7 @@ const PdfReport: React.FC = () => {
       try {
         const [
           services, agents, uptimes, sfpPorts, switches,
-          kpiInitial, volume, incidentTrends, demandTrends, charts,
+          kpiInitial, volume, incidentTrends, demandTrends,
         ] = await Promise.all([
           getServiceAvailability(),
           getAgentAvailabilityStats(),
@@ -207,7 +138,6 @@ const PdfReport: React.FC = () => {
           getGlpiTicketVolume(),
           getGlpiTimeTrends(1),
           getGlpiTimeTrends(2),
-          getZabbixReportCharts(),
         ]);
 
         // If current month has no tickets, fall back to the latest month that does
@@ -230,7 +160,6 @@ const PdfReport: React.FC = () => {
         setGlpiVolume(volume);
         setGlpiIncidentTrends(incidentTrends);
         setGlpiDemandTrends(demandTrends);
-        setReportCharts(charts);
       } catch (e) {
         console.error('PdfReport fetch error:', e);
       } finally {
@@ -238,132 +167,6 @@ const PdfReport: React.FC = () => {
       }
     })();
   }, []);
-
-  // ─── PDF builder (smart page breaks — never cuts through a table row or heading) ──
-  const buildPdf = async (): Promise<jsPDF | null> => {
-    if (!reportRef.current) return null;
-    const el = reportRef.current;
-
-    // Let ApexCharts SVGs and fonts finish rendering before capture
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Force the element to A4 width so the captured canvas exactly matches A4
-    // proportions with no leftover horizontal space. 794 px = A4 at 96 DPI.
-    const CAPTURE_W = 794;
-    const savedWidth = el.style.width;
-    el.style.width = `${CAPTURE_W}px`;
-
-    const restoreColors = convertOklabColors(el);
-    const restoreGradients = fixGradientTransparents(el);
-    try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: CAPTURE_W,
-        height: el.scrollHeight,
-        windowWidth: CAPTURE_W,
-      });
-
-      const A4_W = 210;
-      const A4_H = 297;
-      const pxPerMm = canvas.width / A4_W;
-      const pageH = Math.floor(A4_H * pxPerMm); // canvas pixels that fit one A4 page
-
-      // ── Collect bounding boxes (canvas px) of every element that must not be cut ──
-      // All elements regardless of height — tall cards (> pageH) are allowed to span
-      // pages but are pushed to START at the top of a fresh page on the first hit.
-      const rootRect = el.getBoundingClientRect();
-      const sy = canvas.height / rootRect.height;
-      const noSplit: { top: number; bottom: number }[] = [];
-      el.querySelectorAll<HTMLElement>('tr, h2, h3, [data-pdf-card]').forEach(elem => {
-        const r = elem.getBoundingClientRect();
-        const top = (r.top - rootRect.top) * sy;
-        const bottom = (r.bottom - rootRect.top) * sy;
-        if (top < bottom) noSplit.push({ top, bottom });
-      });
-
-      // ── Determine where to break each page ───────────────────────────────────
-      // For each natural break, scan ALL overlapping no-split elements and choose
-      // the one with the SMALLEST top — that's the outermost/earliest element.
-      // Pushing to its top guarantees the break lands outside every overlapping block.
-      const pageBreaks: number[] = [];
-      let nextBreak = pageH;
-      while (nextBreak < canvas.height) {
-        let bp = nextBreak;
-        const prev = pageBreaks.length > 0 ? pageBreaks[pageBreaks.length - 1] : 0;
-
-        let bestCandidate: number | null = null;
-        for (const { top, bottom } of noSplit) {
-          if (bp > top + 4 && bp < bottom - 4) {
-            const candidate = top - 8; // just above this element
-            // Reject candidates that would leave < 5 % of a page before the break
-            if (candidate > prev + pageH * 0.05) {
-              if (bestCandidate === null || candidate < bestCandidate) {
-                bestCandidate = candidate;
-              }
-            }
-          }
-        }
-        if (bestCandidate !== null) bp = bestCandidate;
-
-        pageBreaks.push(bp);
-        nextBreak = bp + pageH;
-      }
-
-      // ── Slice canvas and assemble PDF ─────────────────────────────────────────
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const sliceStarts = [0, ...pageBreaks];
-      for (let i = 0; i < sliceStarts.length; i++) {
-        const startPx = sliceStarts[i];
-        const endPx = i + 1 < sliceStarts.length ? sliceStarts[i + 1] : canvas.height;
-        const heightPx = endPx - startPx;
-        const heightMm = heightPx / pxPerMm;
-        const slice = document.createElement('canvas');
-        slice.width = canvas.width;
-        slice.height = heightPx;
-        const ctx = slice.getContext('2d')!;
-        // Fill white before compositing — prevents black bands on the final short
-        // page and on any rounding gaps where the source canvas doesn't reach.
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, slice.width, slice.height);
-        ctx.drawImage(canvas, 0, -startPx);
-        if (i > 0) pdf.addPage();
-        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, heightMm);
-      }
-      return pdf;
-    } finally {
-      el.style.width = savedWidth;
-      restoreColors();
-      restoreGradients();
-    }
-  };
-
-  const handleExport = async () => {
-    setExporting(true); setExportStatus('idle');
-    try {
-      const pdf = await buildPdf();
-      if (pdf) { pdf.save(`rapport-kpi-${_now.toISOString().slice(0, 10)}.pdf`); setExportStatus('success'); setTimeout(() => setExportStatus('idle'), 4000); }
-    } catch (e) { console.error('PDF export failed:', e); setExportStatus('error'); setTimeout(() => setExportStatus('idle'), 4000); }
-    finally { setExporting(false); }
-  };
-
-  const handleSendEmail = async () => {
-    setSending(true); setEmailStatus('idle');
-    try {
-      const pdf = await buildPdf();
-      if (!pdf) return;
-      const filename = `rapport-kpi-${_now.toISOString().slice(0, 10)}.pdf`;
-      const monthLabel = _now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-      const raw = pdf.output('datauristring');
-      const pdfBase64 = (typeof raw === 'string' ? raw : '').split(',')[1] ?? '';
-      await sendReportByEmail(pdfBase64, filename, monthLabel);
-      setEmailStatus('success'); setTimeout(() => setEmailStatus('idle'), 4000);
-    } catch (e) { console.error('Email send failed:', e); setEmailStatus('error'); setTimeout(() => setEmailStatus('idle'), 4000); }
-    finally { setSending(false); }
-  };
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
@@ -491,24 +294,13 @@ const PdfReport: React.FC = () => {
 
   // GLPI performance analysis
   const sortedVol = [...glpiVolume].sort((a, b) => a.month.localeCompare(b.month));
-  const lastVol = sortedVol.at(-1);
   const prevVol = sortedVol.at(-2);
-  const volChangePct = lastVol && prevVol && prevVol.tickets > 0
-    ? ((lastVol.tickets - prevVol.tickets) / prevVol.tickets) * 100
-    : null;
 
   const incTtoOwn = glpiIncidentTrends?.timeToOwn ?? [];
   const curTto = incTtoOwn.at(-1)?.value;
   const prvTto = incTtoOwn.at(-2)?.value;
   const ttoChangePct = curTto !== undefined && prvTto !== undefined && prvTto !== 0
     ? ((curTto - prvTto) / prvTto) * 100
-    : null;
-
-  const incTtoClose = glpiIncidentTrends?.timeToClose ?? [];
-  const curTtc = incTtoClose.at(-1)?.value;
-  const prvTtc = incTtoClose.at(-2)?.value;
-  const ttcChangePct = curTtc !== undefined && prvTtc !== undefined && prvTtc !== 0
-    ? ((curTtc - prvTtc) / prvTtc) * 100
     : null;
 
   // Chart configs
@@ -559,97 +351,6 @@ const PdfReport: React.FC = () => {
       ]
     : [];
 
-  // ─── 30-day history chart helpers ────────────────────────────────────────────
-
-  const dayLabel = (d: string) => d.slice(5); // "YYYY-MM-DD" → "MM-DD"
-
-  const serviceChartOpts = (data: ChartDayRaw[], hasIncident: boolean): ApexOptions => ({
-    chart: { type: 'area', fontFamily: 'Inter, sans-serif', toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
-    stroke: { curve: 'stepline', width: 1.5 },
-    colors: [hasIncident ? '#F59E0B' : BRAND.green],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: hasIncident ? 0.35 : 0.22, opacityTo: 0.02, stops: [0, 100] } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.map(d => dayLabel(d.day)),
-      tickAmount: 6,
-      labels: { style: { colors: '#94A3B8', fontSize: '9px' } },
-      axisBorder: { show: false }, axisTicks: { show: false },
-    },
-    // No y-axis labels for binary charts — the card header explains the scale
-    yaxis: { min: 0, max: 1, labels: { show: false } },
-    grid: { borderColor: '#EEF2F7', strokeDashArray: 5, padding: { left: 0, right: 8, top: 4, bottom: 0 } },
-    tooltip: { theme: 'light', y: { formatter: (v: number) => v === 1 ? 'Service actif' : 'Incident' } },
-  });
-
-  const uptimeChartOpts = (data: ChartDayRaw[]): ApexOptions => ({
-    chart: { type: 'area', fontFamily: 'Inter, sans-serif', toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
-    stroke: { curve: 'smooth', width: 2 },
-    colors: [BRAND.darkBlue],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.18, opacityTo: 0.0, stops: [0, 90] } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.map(d => dayLabel(d.day)),
-      tickAmount: 5,
-      labels: { style: { colors: '#B0BBCC', fontSize: '9px' } },
-      axisBorder: { show: false }, axisTicks: { show: false },
-    },
-    yaxis: { tickAmount: 2, labels: { style: { colors: '#B0BBCC', fontSize: '9px' }, formatter: (v: number) => `${Math.round(v / 86400)}j` } },
-    grid: { borderColor: '#EEF2F7', strokeDashArray: 5, padding: { left: 0, right: 8, top: 4, bottom: 0 } },
-    tooltip: { theme: 'light', y: { formatter: (v: number) => `${(v / 86400).toFixed(1)} jours` } },
-  });
-
-  const agentChartOpts = (data: AgentChartDay[]): ApexOptions => ({
-    chart: { type: 'area', fontFamily: 'Inter, sans-serif', toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
-    stroke: { curve: 'smooth', width: 2 },
-    colors: [BRAND.green],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.2, opacityTo: 0.0, stops: [0, 90] } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.map(d => dayLabel(d.day)),
-      tickAmount: 5,
-      labels: { style: { colors: '#B0BBCC', fontSize: '9px' } },
-      axisBorder: { show: false }, axisTicks: { show: false },
-    },
-    yaxis: { min: 0, max: 100, tickAmount: 2, labels: { style: { colors: '#B0BBCC', fontSize: '9px' }, formatter: (v: number) => `${v}%` } },
-    grid: { borderColor: '#EEF2F7', strokeDashArray: 5, padding: { left: 0, right: 8, top: 4, bottom: 0 } },
-    tooltip: { theme: 'light', y: { formatter: (v: number) => `${v.toFixed(1)}%` } },
-  });
-
-  const sfpChartOpts = (data: ChartDayRaw[], hasDown: boolean): ApexOptions => ({
-    chart: { type: 'area', fontFamily: 'Inter, sans-serif', toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
-    stroke: { curve: 'stepline', width: 2 },
-    colors: [hasDown ? '#EF4444' : BRAND.green],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: hasDown ? 0.25 : 0.15, opacityTo: 0.0, stops: [0, 90] } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.map(d => dayLabel(d.day)),
-      tickAmount: 5,
-      labels: { style: { colors: '#B0BBCC', fontSize: '9px' } },
-      axisBorder: { show: false }, axisTicks: { show: false },
-    },
-    yaxis: { min: 0, max: 1, labels: { show: false } },
-    grid: { borderColor: '#EEF2F7', strokeDashArray: 5, padding: { left: 0, right: 8, top: 4, bottom: 0 } },
-    tooltip: { theme: 'light', y: { formatter: (v: number) => v === 1 ? 'UP — Lien actif' : 'DOWN — Coupure' } },
-  });
-
-  const switchChartOpts = (data: ChartDayRaw[]): ApexOptions => ({
-    chart: { type: 'area', fontFamily: 'Inter, sans-serif', toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
-    stroke: { curve: 'smooth', width: 2 },
-    colors: [NAVY],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.14, opacityTo: 0.0, stops: [0, 90] } },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: data.map(d => dayLabel(d.day)),
-      tickAmount: 5,
-      labels: { style: { colors: '#B0BBCC', fontSize: '9px' } },
-      axisBorder: { show: false }, axisTicks: { show: false },
-    },
-    yaxis: { tickAmount: 2, labels: { style: { colors: '#B0BBCC', fontSize: '9px' }, formatter: (v: number) => `${(v / 604800).toFixed(1)}sem` } },
-    grid: { borderColor: '#EEF2F7', strokeDashArray: 5, padding: { left: 0, right: 8, top: 4, bottom: 0 } },
-    tooltip: { theme: 'light', y: { formatter: (v: number) => `${(v / 86400).toFixed(1)} jours` } },
-  });
-
-  const busy = exporting || sending;
   const todayStr = _now.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   // ─── Row background helper ───────────────────────────────────────────────────
@@ -658,50 +359,22 @@ const PdfReport: React.FC = () => {
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* ── Toolbar ── */}
+      {/* ── Header ── */}
       <div
-        className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-white p-4 rounded-xl border border-[#E2E8F0]"
+        className="flex items-center gap-3 bg-white p-4 rounded-xl border border-[#E2E8F0]"
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${NAVY}12` }}>
-            <FileText className="w-5 h-5" style={{ color: NAVY }} />
-          </div>
-          <div>
-            <p className="text-[15px] font-semibold text-[#0F172A]">Rapport KPI — Disponibilité & Continuité</p>
-            <p className="text-[12px] text-[#94A3B8]">Période : {periodFrom} → {periodTo} (30 derniers jours)</p>
-          </div>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${NAVY}12` }}>
+          <FileText className="w-5 h-5" style={{ color: NAVY }} />
         </div>
-        <div className="flex gap-3 flex-wrap">
-          <button
-            onClick={handleExport} disabled={busy}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-60 border"
-            style={{
-              color: exportStatus === 'success' ? '#059669' : exportStatus === 'error' ? '#DC2626' : 'white',
-              borderColor: exportStatus === 'success' ? '#10B981' : exportStatus === 'error' ? '#EF4444' : 'transparent',
-              backgroundColor: exportStatus === 'success' ? '#ECFDF5' : exportStatus === 'error' ? '#FEF2F2' : NAVY,
-            }}
-          >
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : exportStatus === 'success' ? <CheckCircle className="w-4 h-4" /> : exportStatus === 'error' ? <AlertCircle className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-            {exporting ? 'Génération...' : exportStatus === 'success' ? 'Téléchargé !' : exportStatus === 'error' ? 'Échec export' : 'Exporter PDF'}
-          </button>
-          <button
-            onClick={handleSendEmail} disabled={busy}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all disabled:opacity-60 border"
-            style={{
-              color: emailStatus === 'success' ? '#059669' : emailStatus === 'error' ? '#DC2626' : NAVY,
-              borderColor: emailStatus === 'success' ? '#10B981' : emailStatus === 'error' ? '#EF4444' : `${NAVY}40`,
-              backgroundColor: emailStatus === 'success' ? '#ECFDF5' : emailStatus === 'error' ? '#FEF2F2' : 'white',
-            }}
-          >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : emailStatus === 'success' ? <CheckCircle className="w-4 h-4" /> : emailStatus === 'error' ? <AlertCircle className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-            {sending ? 'Envoi...' : emailStatus === 'success' ? 'Envoyé !' : emailStatus === 'error' ? 'Échec' : 'Envoyer par Email'}
-          </button>
+        <div>
+          <p className="text-[15px] font-semibold text-[#0F172A]">Rapport KPI — Disponibilité & Continuité</p>
+          <p className="text-[12px] text-[#94A3B8]">Période : {periodFrom} → {periodTo} (30 derniers jours)</p>
         </div>
       </div>
 
-      {/* ── Report body (captured for PDF) ── */}
-      <div ref={reportRef} className="bg-white p-8 space-y-10" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
+      {/* ── Report body ── */}
+      <div className="bg-white p-8 space-y-10" style={{ fontFamily: 'Inter, Arial, sans-serif' }}>
 
         {/* ════ COVER ════ */}
         <div className="pb-6">
@@ -854,98 +527,6 @@ const PdfReport: React.FC = () => {
             </tbody>
           </table>
 
-          {/* Disponibilité Agents – détail */}
-          {agentData.length > 0 && (
-            <>
-              <SubTitle text="Disponibilité des Agents Zabbix – Détail" />
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: NAVY }}>
-                    <th className={THN}>Hôte</th>
-                    <th className={THN}>Statut actuel</th>
-                    <th className={THN}>Disponibilité (30j)</th>
-                    <th className={THN}>Vérifications</th>
-                    <th className={THN}>Dernière Indisponibilité</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agentData.map((agent, i) => {
-                    const avail = Number(agent.availability_pct);
-                    const color = avail >= 99 ? '#059669' : avail >= 95 ? '#D97706' : '#DC2626';
-                    const online = String(agent.current_status) === '1';
-                    return (
-                      <tr key={i} style={{ backgroundColor: rowBg(i) }}>
-                        <td className={TDB}>{agent.host}</td>
-                        <td className={TDR}>
-                          <span
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                            style={{ backgroundColor: online ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', color: online ? '#059669' : '#DC2626' }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: online ? '#10B981' : '#EF4444' }} />
-                            {online ? 'En ligne' : 'Hors ligne'}
-                          </span>
-                        </td>
-                        <td className={TDR}>
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-24 h-2 rounded-full overflow-hidden" style={{ backgroundColor: hexRgba(color, 0.1) }}>
-                              <div className="h-full rounded-full" style={{ width: `${Math.min(avail, 100)}%`, background: `linear-gradient(90deg, ${color} 0%, ${hexRgba(color, 0.8)} 100%)` }} />
-                            </div>
-                            <span className="text-[12px] font-bold" style={{ color }}>{avail.toFixed(2)}%</span>
-                          </div>
-                        </td>
-                        <td className={TDR}>{agent.total_checks.toLocaleString()}</td>
-                        <td className={TDR}>
-                          {agent.last_unavailable ? new Date(agent.last_unavailable).toLocaleDateString('fr-FR') : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {/* Uptime Serveurs – détail */}
-          {uptimeData.length > 0 && (
-            <>
-              <SubTitle text="Uptime des Serveurs – Détail" />
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: NAVY }}>
-                    <th className={THN}>Serveur</th>
-                    <th className={THN}>Uptime Actuel</th>
-                    <th className={THN}>Redémarrages (30j)</th>
-                    <th className={THN}>Dernier Redémarrage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {uptimeData.map((u, i) => (
-                    <tr key={i} style={{ backgroundColor: rowBg(i) }}>
-                      <td className={TDB}>{u.host}</td>
-                      <td className={TDR}>
-                        <span className="font-semibold" style={{ color: NAVY }}>{formatUptime(u.current_uptime_seconds)}</span>
-                      </td>
-                      <td className={TDR}>
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold"
-                          style={{
-                            backgroundColor: u.restart_count === 0 ? 'rgba(5,150,105,0.08)' : 'rgba(217,119,6,0.08)',
-                            color: u.restart_count === 0 ? '#059669' : '#D97706',
-                          }}
-                        >
-                          {u.restart_count}
-                        </span>
-                      </td>
-                      <td className={TDR}>
-                        {u.last_restart_time ? new Date(u.last_restart_time).toLocaleDateString('fr-FR') : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-
           {/* Services applicatifs – synthèse running/anomaly/stopped */}
           {totalServicesMonitored > 0 && (
             <>
@@ -964,161 +545,6 @@ const PdfReport: React.FC = () => {
                     <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color }}>{label}</p>
                   </div>
                 ))}
-              </div>
-            </>
-          )}
-
-          {/* ── Charts: service state per day ── */}
-          {reportCharts && reportCharts.services.length > 0 && (
-            <>
-              <SubTitle text="Évolution de l'état des services (30 jours)" />
-              <div className="grid grid-cols-2 gap-4">
-                {reportCharts.services.map((svc) => {
-                  const hasIncident = svc.data.some(d => d.max > 0);
-                  const incidentDays = svc.data.filter(d => d.max > 0).length;
-                  const firstInc = svc.data.find(d => d.max > 0)?.day;
-                  const accent = hasIncident ? '#F59E0B' : BRAND.green;
-                  return (
-                    <div key={svc.itemid} data-pdf-card="true" className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E8EDF3', boxShadow: '0 2px 8px rgba(27,58,107,0.05)' }}>
-                      {/* card header */}
-                      <div className="flex items-start justify-between px-4 pt-3.5 pb-2" style={{ background: `linear-gradient(135deg, rgba(27,58,107,0.04) 0%, rgba(27,58,107,0) 70%)` }}>
-                        <div className="min-w-0 pr-2">
-                          <p className="text-[12px] font-bold text-[#0F172A] leading-tight truncate">{svc.service}</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-0.5">{svc.host} · état journalier</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-semibold shrink-0" style={{ backgroundColor: hasIncident ? '#FEF3C7' : '#ECFDF5', color: hasIncident ? '#92400E' : '#065F46' }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
-                          {hasIncident ? 'Anomalie' : 'Stable'}
-                        </span>
-                      </div>
-                      {/* chart */}
-                      <div style={{ height: 120, marginLeft: -2, marginRight: -2 }}>
-                        <Chart
-                          options={serviceChartOpts(svc.data, hasIncident)}
-                          series={[{ name: 'État', data: svc.data.map(d => d.max > 0 ? 0 : 1) }]}
-                          type="area"
-                          height="100%"
-                        />
-                      </div>
-                      {/* footer bullets */}
-                      <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        {hasIncident ? (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{incidentDays} jour(s) d'anomalie{firstInc ? ` — premier : ${firstInc.slice(5)}` : ''}</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Consulter les logs Windows Service Control Manager</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#065F46' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun arrêt visible sur 30 jours</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Service opérationnel en continu</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* ── Charts: uptime history ── */}
-          {reportCharts && reportCharts.uptimes.length > 0 && (
-            <>
-              <SubTitle text="Évolution de l'uptime des serveurs (30 jours)" />
-              <div className="grid grid-cols-2 gap-4">
-                {reportCharts.uptimes.map((svc) => {
-                  if (svc.data.length === 0) return (
-                    <div key={svc.itemid} className="rounded-xl bg-white flex items-center justify-center" style={{ minHeight: 160, border: '1px solid #E8EDF3' }}>
-                      <p className="text-[10px] text-[#94A3B8]">{svc.host} – Données insuffisantes</p>
-                    </div>
-                  );
-                  const restartDays = svc.data.reduce<string[]>((acc, d, i) => {
-                    if (i > 0 && d.avg < svc.data[i - 1].avg * 0.5) acc.push(d.day);
-                    return acc;
-                  }, []);
-                  const maxUpDays = svc.data.reduce((m, d) => Math.max(m, d.avg / 86400), 0);
-                  const hasRestart = restartDays.length > 0;
-                  const accent = hasRestart ? '#F59E0B' : BRAND.darkBlue;
-                  return (
-                    <div key={svc.itemid} data-pdf-card="true" className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E8EDF3', boxShadow: '0 2px 8px rgba(27,58,107,0.05)' }}>
-                      <div className="flex items-start justify-between px-4 pt-3.5 pb-2" style={{ background: `linear-gradient(135deg, rgba(27,58,107,0.04) 0%, rgba(27,58,107,0) 70%)` }}>
-                        <div className="min-w-0 pr-2">
-                          <p className="text-[12px] font-bold text-[#0F172A] leading-tight">{svc.host} – Uptime</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-0.5">Continu · une chute = redémarrage</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-semibold shrink-0" style={{ backgroundColor: hasRestart ? '#FEF3C7' : '#EFF6FF', color: hasRestart ? '#92400E' : '#1E40AF' }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
-                          {hasRestart ? `${restartDays.length} redém.` : 'Stable'}
-                        </span>
-                      </div>
-                      <div style={{ height: 120, marginLeft: -2, marginRight: -2 }}>
-                        <Chart
-                          options={uptimeChartOpts(svc.data)}
-                          series={[{ name: 'Uptime', data: svc.data.map(d => d.avg) }]}
-                          type="area"
-                          height="100%"
-                        />
-                      </div>
-                      <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        {hasRestart ? (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{restartDays.length} redémarrage(s) détecté(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Vérifier les journaux Windows et les mises à jour</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun redémarrage sur 30 jours</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Uptime max observé : {maxUpDays.toFixed(1)} jours</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* ── Charts: agent availability ── */}
-          {reportCharts && reportCharts.agents.length > 0 && (
-            <>
-              <SubTitle text="Disponibilité journalière de l'agent Zabbix (30 jours)" />
-              <div className="grid grid-cols-2 gap-4">
-                {reportCharts.agents.map((svc) => {
-                  const avgPct = svc.data.length > 0
-                    ? svc.data.reduce((s, d) => s + d.avail_pct, 0) / svc.data.length : 0;
-                  const minPct = svc.data.length > 0 ? Math.min(...svc.data.map(d => d.avail_pct)) : 0;
-                  const ok = avgPct >= 99.5;
-                  return (
-                    <div key={svc.itemid} data-pdf-card="true" className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E8EDF3', boxShadow: '0 2px 8px rgba(61,190,122,0.06)' }}>
-                      <div className="flex items-start justify-between px-4 pt-3.5 pb-2" style={{ background: `linear-gradient(135deg, rgba(61,190,122,0.04) 0%, rgba(61,190,122,0) 70%)` }}>
-                        <div className="min-w-0 pr-2">
-                          <p className="text-[12px] font-bold text-[#0F172A] leading-tight">{svc.host} – Agent Zabbix</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-0.5">Disponibilité journalière (%)</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-semibold shrink-0" style={{ backgroundColor: ok ? '#ECFDF5' : '#FEF3C7', color: ok ? '#065F46' : '#92400E' }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ok ? BRAND.green : '#F59E0B' }} />
-                          {avgPct.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div style={{ height: 120, marginLeft: -2, marginRight: -2 }}>
-                        <Chart
-                          options={agentChartOpts(svc.data)}
-                          series={[{ name: 'Disponibilité', data: svc.data.map(d => d.avail_pct) }]}
-                          type="area"
-                          height="100%"
-                        />
-                      </div>
-                      <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: ok ? '#065F46' : '#92400E' }}>
-                          {ok ? <CheckCircle className="w-3 h-3 shrink-0" /> : <AlertCircle className="w-3 h-3 shrink-0" />}
-                          Disponibilité moyenne : {avgPct.toFixed(2)}%
-                        </p>
-                        <p className="text-[9.5px] text-[#64748B]">→ Minimum journalier : {minPct.toFixed(1)}%{minPct < 99 ? ' — indisponibilité à investiguer' : ''}</p>
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             </>
           )}
@@ -1154,208 +580,6 @@ const PdfReport: React.FC = () => {
               ))}
             </tbody>
           </table>
-
-          {/* Uptime Switches – détail */}
-          {switchData.length > 0 && (
-            <>
-              <SubTitle text="Uptime des Switches Réseau – Détail" />
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: NAVY }}>
-                    <th className={THN}>Switch</th>
-                    <th className={THN}>Uptime</th>
-                    <th className={THN}>Ports UP / Total</th>
-                    <th className={THN}>Ports DOWN</th>
-                    <th className={THN}>Redémarrages</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {switchData.map((sw, i) => (
-                    <tr key={i} style={{ backgroundColor: rowBg(i) }}>
-                      <td className={TDB}>{sw.switch_name}</td>
-                      <td className={TDR}><span className="font-semibold" style={{ color: NAVY }}>{formatUptime(sw.current_uptime_seconds)}</span></td>
-                      <td className={TDR}>
-                        <span style={{ color: '#059669', fontWeight: 600 }}>{sw.up_ports}</span>
-                        <span style={{ color: '#94A3B8' }}> / {sw.total_ports}</span>
-                      </td>
-                      <td className={TDR}>
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold"
-                          style={{ backgroundColor: sw.down_ports > 0 ? 'rgba(220,38,38,0.08)' : 'rgba(5,150,105,0.08)', color: sw.down_ports > 0 ? '#DC2626' : '#059669' }}
-                        >
-                          {sw.down_ports}
-                        </span>
-                      </td>
-                      <td className={TDR}>
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold"
-                          style={{ backgroundColor: sw.restart_count === 0 ? 'rgba(5,150,105,0.08)' : 'rgba(217,119,6,0.08)', color: sw.restart_count === 0 ? '#059669' : '#D97706' }}
-                        >
-                          {sw.restart_count}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {/* SFP Ports – détail */}
-          {sfpData.length > 0 && (
-            <>
-              <SubTitle text="Ports SFP — Statut des Liaisons Uplink" />
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: NAVY }}>
-                    <th className={THN}>Port</th>
-                    <th className={THN}>Valeur Actuelle</th>
-                    <th className={THN}>Moyenne</th>
-                    <th className={THN}>Maximum</th>
-                    <th className={THN}>Coupures (30j)</th>
-                    <th className={THN}>Dernière Coupure</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sfpData.map((port, i) => {
-                    const downCount = Number(port.down_count);
-                    const isDown = port.last_value !== null && Number(port.last_value) === 0;
-                    return (
-                      <tr key={i} style={{ backgroundColor: rowBg(i) }}>
-                        <td className={TDB}>
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: isDown ? '#EF4444' : '#10B981' }} />
-                            {port.port_name}
-                          </div>
-                        </td>
-                        <td className={TDR}>{port.last_value !== null ? Number(port.last_value).toFixed(0) : '—'}</td>
-                        <td className={TDR}>{port.avg_value !== null ? Number(port.avg_value).toFixed(1) : '—'}</td>
-                        <td className={TDR}>{port.max_value !== null ? Number(port.max_value).toFixed(0) : '—'}</td>
-                        <td className={TDR}>
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold"
-                            style={{ backgroundColor: downCount === 0 ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)', color: downCount === 0 ? '#059669' : '#DC2626' }}
-                          >
-                            {downCount}
-                          </span>
-                        </td>
-                        <td className={TDR}>{port.last_down ? new Date(port.last_down).toLocaleDateString('fr-FR') : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </>
-          )}
-
-          {/* ── Charts: switch uptime history ── */}
-          {reportCharts && reportCharts.switchUptimes.length > 0 && (
-            <>
-              <SubTitle text="Évolution de l'uptime des switches (30 jours)" />
-              <div className="grid grid-cols-2 gap-4">
-                {reportCharts.switchUptimes.map((sw) => {
-                  if (sw.data.length === 0) return (
-                    <div key={sw.itemid} className="rounded-xl bg-white flex items-center justify-center" style={{ minHeight: 160, border: '1px solid #E8EDF3' }}>
-                      <p className="text-[10px] text-[#94A3B8]">{sw.host} – Données insuffisantes</p>
-                    </div>
-                  );
-                  const restartDays = sw.data.reduce<string[]>((acc, d, i) => {
-                    if (i > 0 && d.avg < sw.data[i - 1].avg * 0.5) acc.push(d.day);
-                    return acc;
-                  }, []);
-                  const maxUpWeeks = sw.data.reduce((m, d) => Math.max(m, d.avg / 604800), 0);
-                  const hasRestart = restartDays.length > 0;
-                  return (
-                    <div key={sw.itemid} data-pdf-card="true" className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E8EDF3', boxShadow: '0 2px 8px rgba(27,58,107,0.05)' }}>
-                      <div className="flex items-start justify-between px-4 pt-3.5 pb-2" style={{ background: `linear-gradient(135deg, rgba(27,58,107,0.04) 0%, rgba(27,58,107,0) 70%)` }}>
-                        <div className="min-w-0 pr-2">
-                          <p className="text-[12px] font-bold text-[#0F172A] leading-tight">{sw.host} – Uptime</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-0.5">Continu · chute = redémarrage switch</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-semibold shrink-0" style={{ backgroundColor: hasRestart ? '#FEF3C7' : '#EFF6FF', color: hasRestart ? '#92400E' : '#1E40AF' }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hasRestart ? '#F59E0B' : NAVY }} />
-                          {hasRestart ? `${restartDays.length} redém.` : 'Stable'}
-                        </span>
-                      </div>
-                      <div style={{ height: 120, marginLeft: -2, marginRight: -2 }}>
-                        <Chart
-                          options={switchChartOpts(sw.data)}
-                          series={[{ name: 'Uptime', data: sw.data.map(d => d.avg) }]}
-                          type="area"
-                          height="100%"
-                        />
-                      </div>
-                      <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        {hasRestart ? (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#92400E' }}><AlertCircle className="w-3 h-3 shrink-0" />{restartDays.length} redémarrage(s) : {restartDays.map(d => d.slice(5)).join(', ')}</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Vérifier l'alimentation et les logs SNMP</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}><CheckCircle className="w-3 h-3 shrink-0" />Aucun redémarrage sur 30 jours</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Uptime max : {maxUpWeeks.toFixed(1)} semaines</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* ── Charts: SFP port status ── */}
-          {reportCharts && reportCharts.sfpPorts.length > 0 && (
-            <>
-              <SubTitle text="Statut journalier des liaisons SFP (30 jours)" />
-              <div className="grid grid-cols-2 gap-4">
-                {reportCharts.sfpPorts.map((port) => {
-                  const downDays = port.data.filter(d => d.max >= 2);
-                  const hasDown = downDays.length > 0;
-                  const downFlags = port.data.map(d => d.max >= 2 ? 0 : 1);
-                  // Short label: "SW1 – Port SFP 49" → "Port SFP 49" + host "SW1"
-                  const [hostPart, ...rest] = port.label.split(' – ');
-                  const portPart = rest.join(' – ') || port.label;
-                  return (
-                    <div key={port.itemid} data-pdf-card="true" className="rounded-xl bg-white overflow-hidden" style={{ border: '1px solid #E8EDF3', boxShadow: '0 2px 8px rgba(27,58,107,0.05)' }}>
-                      <div className="flex items-start justify-between px-4 pt-3.5 pb-2" style={{ background: `linear-gradient(135deg, rgba(27,58,107,0.04) 0%, rgba(27,58,107,0) 70%)` }}>
-                        <div className="min-w-0 pr-2">
-                          <p className="text-[12px] font-bold text-[#0F172A] leading-tight truncate">{portPart}</p>
-                          <p className="text-[10px] text-[#94A3B8] mt-0.5">{hostPart} · statut ifOperStatus</p>
-                        </div>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-semibold shrink-0" style={{ backgroundColor: hasDown ? '#FEF2F2' : '#ECFDF5', color: hasDown ? '#991B1B' : '#065F46' }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hasDown ? '#EF4444' : BRAND.green }} />
-                          {hasDown ? `${downDays.length} coupure(s)` : 'UP stable'}
-                        </span>
-                      </div>
-                      <div style={{ height: 120, marginLeft: -2, marginRight: -2 }}>
-                        <Chart
-                          options={sfpChartOpts(port.data, hasDown)}
-                          series={[{ name: 'État SFP', data: downFlags }]}
-                          type="area"
-                          height="100%"
-                        />
-                      </div>
-                      <div className="px-4 pt-2 pb-3.5 border-t border-[#F1F5F9] mt-1 space-y-1">
-                        {hasDown ? (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#991B1B' }}><AlertCircle className="w-3 h-3 shrink-0" />{downDays.length} jour(s) de coupure SFP détecté(s)</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Vérifier le câble SFP et la négociation de liaison</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: '#065F46' }}><CheckCircle className="w-3 h-3 shrink-0" />Liaison SFP stable — aucune coupure sur 30 jours</p>
-                            <p className="text-[9.5px] text-[#64748B]">→ Port {hostPart} opérationnel en continu</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
         </div>
 
         {/* ════ SECTION 3 — GLPI ════ */}
@@ -1433,7 +657,7 @@ const PdfReport: React.FC = () => {
             {glpiVolume.length > 0 && (
               <>
                 <SubTitle text="Volumétrie des Tickets par Mois" />
-                <div data-pdf-card="true" className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                   <p className="text-[12px] text-[#94A3B8] mb-3">Volume mensuel de création de tickets</p>
                   <div className="h-56">
                     <Chart
@@ -1447,12 +671,12 @@ const PdfReport: React.FC = () => {
               </>
             )}
 
-            {/* Time trends charts – SAME DESIGN as existing report page */}
+            {/* Time trends charts */}
             {glpiIncidentTrends && glpiDemandTrends && (
               <>
                 <SubTitle text="Délais Moyens de Traitement – Time to Own / Time to Close (heures)" />
-                <div data-pdf-card="true" className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div data-pdf-card="true" className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <p className="text-[14px] font-semibold text-[#0F172A] mb-1">Délais Moyens — Incidents</p>
                     <p className="text-[12px] text-[#94A3B8] mb-3">Time to Own / Time to Close (heures)</p>
                     <div className="h-56">
@@ -1464,7 +688,7 @@ const PdfReport: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div data-pdf-card="true" className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <p className="text-[14px] font-semibold text-[#0F172A] mb-1">Délais Moyens — Demandes</p>
                     <p className="text-[12px] text-[#94A3B8] mb-3">Time to Own / Time to Close (heures)</p>
                     <div className="h-56">
@@ -1479,137 +703,6 @@ const PdfReport: React.FC = () => {
                 </div>
               </>
             )}
-
-            {/* Performance analysis block */}
-            <div data-pdf-card="true" className="mt-4 rounded-xl border border-[#E2E8F0] overflow-hidden">
-              {/* block header */}
-              <div className="px-5 py-4" style={{ backgroundColor: NAVY }}>
-                <p className="text-[13px] font-bold text-white">Rapport d'Analyse de Performance</p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                  Analyse comparative approfondie basée sur les données des 30 derniers jours.
-                </p>
-              </div>
-
-              <div className="divide-y divide-[#F1F5F9] bg-white">
-
-                {/* 1. Volume */}
-                {lastVol && prevVol && (
-                  <div className="flex items-start gap-4 px-5 py-5">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ backgroundColor: NAVY }}>1</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-[#0F172A] mb-2">Volume des Tickets</p>
-                      <p className="text-[12px] text-[#475569] mb-2.5">
-                        Le nombre de tickets est passé de <strong>{prevVol.tickets}</strong> en {formatMonthFrLong(prevVol.month)}{' '}
-                        à <strong>{lastVol.tickets}</strong> en {formatMonthFrLong(lastVol.month)}.
-                      </p>
-                      {volChangePct !== null && (
-                        <>
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg mb-2" style={{
-                            backgroundColor: volChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
-                            color: volChangePct < 0 ? '#059669' : '#DC2626',
-                          }}>
-                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
-                              {volChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                              {volChangePct < 0 ? 'Réduction' : 'Augmentation'} de ~{Math.abs(volChangePct).toFixed(1)}% vs {formatMonthFrLong(prevVol.month)}
-                            </span>
-                          </div>
-                          <p className="text-[11px] font-mono text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-md px-2.5 py-1.5 mb-2 inline-block">
-                            KPI : ({prevVol.tickets} − {lastVol.tickets}) ÷ {prevVol.tickets} × 100 ≈ {(-volChangePct).toFixed(1)}%
-                          </p>
-                          <p className="text-[11px] text-[#64748B] italic">
-                            {volChangePct < 0
-                              ? "C'est une amélioration importante : moins d'incidents signalés, meilleure stabilité ou efficacité corrective."
-                              : "Activité en hausse — identifier les causes récurrentes et renforcer les actions préventives."}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Time to Own */}
-                {curTto !== undefined && (
-                  <div className="flex items-start gap-4 px-5 py-5">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ backgroundColor: NAVY }}>2</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-[#0F172A] mb-2">Temps de Prise en Charge</p>
-                      <p className="text-[12px] text-[#475569] mb-1">
-                        Time to Own = <strong>{curTto.toFixed(1)} heures</strong> en moyenne.
-                      </p>
-                      <p className="text-[12px] text-[#475569] mb-2.5">
-                        Temps de réaction global{' '}
-                        {curTto < 4 ? 'très satisfaisant' : curTto < 8 ? 'satisfaisant' : 'à améliorer'}{' '}
-                        (~{(curTto / 24).toFixed(1)} j).
-                      </p>
-                      {ttoChangePct !== null && (
-                        <>
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg mb-2" style={{
-                            backgroundColor: ttoChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
-                            color: ttoChangePct < 0 ? '#059669' : '#DC2626',
-                          }}>
-                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
-                              {ttoChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                              {ttoChangePct < 0 ? 'Amélioration' : 'Temps de réaction allongé'} : {ttoChangePct > 0 ? '+' : ''}{ttoChangePct.toFixed(1)}% vs {prvTto !== undefined ? `${prvTto.toFixed(1)} h` : 'mois précédent'}
-                            </span>
-                          </div>
-                          {prvTto !== undefined && (
-                            <p className="text-[11px] font-mono text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-md px-2.5 py-1.5 mb-2 inline-block">
-                              KPI : ({prvTto.toFixed(1)} − {curTto.toFixed(1)}) ÷ {prvTto.toFixed(1)} × 100 ≈ {(-ttoChangePct).toFixed(1)}%
-                            </p>
-                          )}
-                          <p className="text-[11px] text-[#64748B] italic">
-                            {ttoChangePct < 0
-                              ? "Délai en nette amélioration assurant aux utilisateurs une prise en compte rapide de leurs demandes."
-                              : "Délai assurant aux utilisateurs une prise en compte rapide de leurs demandes."}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Délais de Clôture — uses trend data so it shows even if current-month kpi is empty */}
-                {curTtc !== undefined && (
-                  <div className="flex items-start gap-4 px-5 py-5">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ backgroundColor: NAVY }}>3</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-[#0F172A] mb-2">Délais de Clôture</p>
-                      <p className="text-[12px] text-[#475569] mb-1">
-                        Time to Close = <strong>{curTtc.toFixed(1)} heures</strong> en moyenne.
-                      </p>
-                      {curTto !== undefined && (
-                        <>
-                          <p className="text-[12px] text-[#475569] mb-2.5">
-                            Écart moyen entre prise en charge et clôture : <strong>{Math.max(0, curTtc - curTto).toFixed(1)} heures</strong>.
-                          </p>
-                          <p className="text-[11px] font-mono text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-md px-2.5 py-1.5 mb-2 inline-block">
-                            KPI : {curTtc.toFixed(1)} h − {curTto.toFixed(1)} h = {(curTtc - curTto).toFixed(1)} h
-                          </p>
-                        </>
-                      )}
-                      {ttcChangePct !== null && (
-                        <>
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg mb-2" style={{
-                            backgroundColor: ttcChangePct < 0 ? 'rgba(5,150,105,0.09)' : 'rgba(220,38,38,0.07)',
-                            color: ttcChangePct < 0 ? '#059669' : '#DC2626',
-                          }}>
-                            <span className="text-[12px] font-bold inline-flex items-center gap-1">
-                              {ttcChangePct < 0 ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                              {ttcChangePct < 0 ? 'Résolution améliorée' : 'Résolution allongée'} : {ttcChangePct > 0 ? '+' : ''}{ttcChangePct.toFixed(1)}% vs {prvTtc !== undefined ? `${prvTtc.toFixed(1)} h` : 'mois précédent'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-[#64748B] italic">
-                            Le temps de clôture global est influencé principalement par les demandes de service longues (validations, approvisionnements).
-                            Les incidents critiques et techniques restent résolus sous 2h.
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
           </div>
         )}
 
