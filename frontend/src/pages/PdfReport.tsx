@@ -215,6 +215,17 @@ const PdfReport: React.FC = () => {
   const avgAgentAvail = agentData.length > 0
     ? agentData.reduce((s, a) => s + Number(a.availability_pct), 0) / agentData.length : 0;
 
+  // Count-based availability rates (count meeting threshold ÷ total × 100) — distinct
+  // from avgAgentAvail above, which averages each agent's own % rather than counting them.
+  const agentAvailCount = agentData.filter(a => Number(a.availability_pct) >= 99).length;
+  const agentAvailPct = agentData.length > 0 ? (agentAvailCount / agentData.length) * 100 : 0;
+
+  const switchStableCount = switchData.filter(sw => sw.restart_count === 0).length;
+  const switchStablePct = switchData.length > 0 ? (switchStableCount / switchData.length) * 100 : 0;
+
+  const sfpStableCount = sfpData.filter(p => Number(p.down_count) === 0).length;
+  const sfpStablePct = sfpData.length > 0 ? (sfpStableCount / sfpData.length) * 100 : 0;
+
   type KpiRow = { server: string; indicator: string; value: string; comment: string; ok: boolean };
   const serviceKpiRows: KpiRow[] = allServers.flatMap(srv => {
     const rows: KpiRow[] = [];
@@ -534,18 +545,56 @@ const PdfReport: React.FC = () => {
               <p className="text-[12px] text-[#64748B] mb-3">
                 {totalServicesMonitored} services supervisés · {serviceData.length} serveur(s)
               </p>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {[
-                  { label: 'Running', count: globalRunning, bg: '#ECFDF5', border: '#D1FAE5', color: '#059669' },
-                  { label: 'Anomalie', count: globalAnomaly, bg: '#FFFBEB', border: '#FDE68A', color: '#D97706' },
-                  { label: 'Arrêté', count: globalStopped, bg: '#FEF2F2', border: '#FECACA', color: '#DC2626' },
-                ].map(({ label, count, bg, border, color }) => (
+                  { label: 'Running', value: `${globalRunning}`, bg: '#ECFDF5', border: '#D1FAE5', color: '#059669' },
+                  { label: 'Anomalie', value: `${globalAnomaly}`, bg: '#FFFBEB', border: '#FDE68A', color: '#D97706' },
+                  { label: 'Arrêté', value: `${globalStopped}`, bg: '#FEF2F2', border: '#FECACA', color: '#DC2626' },
+                  {
+                    label: 'Disponibilité',
+                    value: `${globalAvailPct}%`,
+                    bg: globalAvailPct >= 90 ? '#ECFDF5' : '#FFFBEB',
+                    border: globalAvailPct >= 90 ? '#D1FAE5' : '#FDE68A',
+                    color: globalAvailPct >= 90 ? '#059669' : '#D97706',
+                  },
+                ].map(({ label, value, bg, border, color }) => (
                   <div key={label} className="text-center p-4 rounded-xl border" style={{ backgroundColor: bg, borderColor: border }}>
-                    <p className="text-[28px] font-extrabold" style={{ color }}>{count}</p>
+                    <p className="text-[28px] font-extrabold" style={{ color }}>{value}</p>
                     <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color }}>{label}</p>
                   </div>
                 ))}
               </div>
+              <p className="text-[9.5px] mt-2.5 text-[#94A3B8]">
+                Calcul : {globalRunning} service(s) opérationnel(s) ÷ {totalServicesMonitored} service(s) supervisé(s) × 100.
+              </p>
+            </>
+          )}
+
+          {/* Disponibilité des Agents Zabbix – synthèse (count / total × 100) */}
+          {agentData.length > 0 && (
+            <>
+              <SubTitle text="Disponibilité des Agents Zabbix – Synthèse" />
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'Disponibles (≥99%)', value: `${agentAvailCount}`, bg: '#ECFDF5', border: '#D1FAE5', color: '#059669' },
+                  { label: 'Sous le seuil (<99%)', value: `${agentData.length - agentAvailCount}`, bg: '#FFFBEB', border: '#FDE68A', color: '#D97706' },
+                  {
+                    label: 'Taux de disponibilité',
+                    value: `${agentAvailPct.toFixed(0)}%`,
+                    bg: agentAvailPct >= 90 ? '#ECFDF5' : '#FFFBEB',
+                    border: agentAvailPct >= 90 ? '#D1FAE5' : '#FDE68A',
+                    color: agentAvailPct >= 90 ? '#059669' : '#D97706',
+                  },
+                ].map(({ label, value, bg, border, color }) => (
+                  <div key={label} className="text-center p-4 rounded-xl border" style={{ backgroundColor: bg, borderColor: border }}>
+                    <p className="text-[28px] font-extrabold" style={{ color }}>{value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color }}>{label}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9.5px] mt-2.5 text-[#94A3B8]">
+                Calcul : {agentAvailCount} agent(s) avec disponibilité ≥ 99% ÷ {agentData.length} agent(s) supervisé(s) × 100.
+              </p>
             </>
           )}
         </div>
@@ -580,6 +629,47 @@ const PdfReport: React.FC = () => {
               ))}
             </tbody>
           </table>
+
+          {/* Disponibilité réseau – synthèse (count / total × 100) */}
+          {(switchData.length > 0 || sfpData.length > 0) && (
+            <>
+              <SubTitle text="Disponibilité Réseau – Synthèse" />
+              <div className="grid grid-cols-2 gap-4">
+                {switchData.length > 0 && (
+                  <div
+                    className="text-center p-4 rounded-xl border"
+                    style={{
+                      backgroundColor: switchStablePct >= 90 ? '#ECFDF5' : '#FFFBEB',
+                      borderColor: switchStablePct >= 90 ? '#D1FAE5' : '#FDE68A',
+                    }}
+                  >
+                    <p className="text-[28px] font-extrabold" style={{ color: switchStablePct >= 90 ? '#059669' : '#D97706' }}>
+                      {switchStablePct.toFixed(0)}%
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: switchStablePct >= 90 ? '#059669' : '#D97706' }}>
+                      Switches sans redémarrage — {switchStableCount}/{switchData.length}
+                    </p>
+                  </div>
+                )}
+                {sfpData.length > 0 && (
+                  <div
+                    className="text-center p-4 rounded-xl border"
+                    style={{
+                      backgroundColor: sfpStablePct >= 90 ? '#ECFDF5' : '#FFFBEB',
+                      borderColor: sfpStablePct >= 90 ? '#D1FAE5' : '#FDE68A',
+                    }}
+                  >
+                    <p className="text-[28px] font-extrabold" style={{ color: sfpStablePct >= 90 ? '#059669' : '#D97706' }}>
+                      {sfpStablePct.toFixed(0)}%
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color: sfpStablePct >= 90 ? '#059669' : '#D97706' }}>
+                      Ports SFP stables — {sfpStableCount}/{sfpData.length}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ════ SECTION 3 — GLPI ════ */}
