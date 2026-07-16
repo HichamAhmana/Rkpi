@@ -458,28 +458,41 @@ const PdfReport: React.FC = () => {
           {/* Global KPI Strip */}
           {totalServicesMonitored > 0 && (() => {
             const globalTiles = [
-              { value: `${allServers.length}`, label: 'Serveurs supervisés', color: NAVY },
-              { value: `${totalServicesMonitored}`, label: 'Services applicatifs', color: BRAND.tealBlue },
+              {
+                value: `${allServers.length}`,
+                label: 'Serveurs supervisés',
+                desc: 'Serveurs suivis par la supervision Zabbix',
+                color: NAVY,
+              },
+              {
+                value: `${totalServicesMonitored}`,
+                label: 'Services applicatifs',
+                desc: 'Services surveillés sur ces serveurs',
+                color: BRAND.tealBlue,
+              },
               {
                 value: `${globalAvailPct}%`,
                 label: 'Services en ligne',
+                desc: 'Part des services restés sans arrêt sur 30 jours',
                 color: globalAvailPct >= 90 ? BRAND.green : '#D97706',
               },
               ...(avgServerUptime !== null ? [{
                 value: `${avgServerUptime.toFixed(1)}%`,
                 label: 'Uptime Serveurs (moy.)',
+                desc: 'Part du temps où les serveurs étaient allumés',
                 color: avgServerUptime >= 99 ? BRAND.green : '#D97706',
               }] : []),
               {
                 value: `${avgAgentAvail.toFixed(1)}%`,
                 label: 'Agent Zabbix (moy.)',
+                desc: 'Part du temps où la supervision répondait',
                 color: avgAgentAvail >= 99 ? BRAND.green : '#D97706',
               },
             ];
             return (
             <div className="mt-5 mb-5">
               <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${globalTiles.length}, minmax(0, 1fr))` }}>
-                {globalTiles.map(({ value, label, color }) => (
+                {globalTiles.map(({ value, label, desc, color }) => (
                   <div
                     key={label}
                     className="rounded-xl p-4 text-center"
@@ -487,6 +500,7 @@ const PdfReport: React.FC = () => {
                   >
                     <p className="text-[24px] font-extrabold" style={{ color, lineHeight: 1.2, margin: 0 }}>{value}</p>
                     <p className="text-[9.5px] font-bold uppercase tracking-wider mt-2" style={{ color: '#64748B' }}>{label}</p>
+                    <p className="text-[9px] mt-1 leading-snug" style={{ color: '#94A3B8' }}>{desc}</p>
                   </div>
                 ))}
               </div>
