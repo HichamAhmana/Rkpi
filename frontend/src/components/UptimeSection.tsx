@@ -64,6 +64,9 @@ const formatUptimeShort = (seconds: number): string => {
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
+const formatPercent = (pct: number): string =>
+  Number.isInteger(pct) ? `${pct}` : pct.toFixed(1);
+
 /* ─────────────────────── Animated Ring ─────────────────────── */
 const UptimeRing: React.FC<{ percentage: number; color: string; size?: number }> = ({
   percentage,
@@ -598,7 +601,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
           <div className="relative flex-shrink-0">
             <UptimeRing percentage={uptimePercent} color={statusColor === '#15803d' ? '#2B5BA8' : '#EF4444'} size={56} />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[12px] font-bold text-[#64748B]">{Math.round(uptimePercent)}%</span>
+              <span className="text-[12px] font-bold text-[#64748B]">{formatPercent(uptimePercent)}%</span>
             </div>
           </div>
 
@@ -621,7 +624,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
             <p className="text-[15px] text-[#94A3B8]">{bootDateStr}</p>
             {/* Calculation explanation */}
             <p className="text-[12px] text-label mt-1">
-              Ring {Math.round(uptimePercent)}% = availability over the last 30 days
+              Ring {formatPercent(uptimePercent)}% = availability over the last 30 days
             </p>
           </div>
         </div>
