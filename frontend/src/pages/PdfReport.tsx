@@ -284,13 +284,17 @@ const PdfReport: React.FC = () => {
     srvServices?.services.forEach(svc => {
       const name = cleanSvcName(svc.service_name);
       const ok = svc.incident_days === 0;
+      // % of days without incident over the 30-day window (day granularity —
+      // a day counts as interrupted if the service was seen stopped that day).
+      const svcPct = ((30 - Math.min(30, svc.incident_days)) / 30) * 100;
+      const svcPctStr = Number.isInteger(svcPct) ? `${svcPct}%` : `${svcPct.toFixed(1)}%`;
       rows.push({
-        indicator: `Arrêts — ${name}`,
-        value: ok ? '0 arrêt' : `${svc.incident_days} jour(s)`,
+        indicator: `Disponibilité — ${name}`,
+        value: svcPctStr,
         ok,
         comment: ok
-          ? 'Service opérationnel en continu sur 30 jours.'
-          : `Service interrompu ${svc.incident_days} jour(s)${svc.last_incident ? ` — dernier : ${new Date(svc.last_incident).toLocaleDateString('fr-FR')}` : ''}.`,
+          ? 'Service opérationnel en continu sur 30 jours (aucun arrêt).'
+          : `Service interrompu ${svc.incident_days} jour(s) sur 30${svc.last_incident ? ` — dernier : ${new Date(svc.last_incident).toLocaleDateString('fr-FR')}` : ''}.`,
       });
     });
     return { server: srv, rows };
