@@ -64,8 +64,11 @@ const formatUptimeShort = (seconds: number): string => {
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
-const formatPercent = (pct: number): string =>
-  Number.isInteger(pct) ? `${pct}` : pct.toFixed(1);
+const formatPercent = (pct: number): string => {
+  const value = Number(pct);
+  if (isNaN(value)) return '---';
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+};
 
 /* ─────────────────────── Animated Ring ─────────────────────── */
 const UptimeRing: React.FC<{ percentage: number; color: string; size?: number }> = ({

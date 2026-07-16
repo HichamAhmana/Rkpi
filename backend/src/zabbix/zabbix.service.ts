@@ -16,6 +16,7 @@ export class ZabbixService implements OnModuleInit {
   // unresolved discrepancy.
   private sfpPortsCache: unknown[] = [];
   private switchUptimeCache: unknown[] = [];
+  private uptimeStatsCache: unknown[] = [];
 
   constructor(
     @InjectDataSource('zabbix')
@@ -25,6 +26,20 @@ export class ZabbixService implements OnModuleInit {
   onModuleInit(): void {
     void this.refreshSfpPortsCache();
     void this.refreshSwitchUptimeCache();
+    void this.refreshUptimeStatsCache();
+  }
+
+  @Cron('*/2 * * * *')
+  async refreshUptimeStatsCache(): Promise<void> {
+    const start = Date.now();
+    try {
+      this.uptimeStatsCache = await this.computeUptimeStats();
+      this.logger.log(
+        `Uptime stats cache refreshed: ${this.uptimeStatsCache.length} rows in ${Date.now() - start}ms`,
+      );
+    } catch (err) {
+      this.logger.error('Failed to refresh uptime stats cache', err);
+    }
   }
 
   @Cron('*/2 * * * *')
@@ -426,60 +441,90 @@ export class ZabbixService implements OnModuleInit {
     }));
   }
 
-  async getUptimeStats(): Promise<unknown[]> {
-    const ids = await this.itemIdsByKey('system.uptime');
-    if (!ids.length) return [];
-    return this.zabbixDataSource.query(
-      `
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        h.name as host,
-        i.itemid,
-        -- Current uptime in seconds (latest value)
-        (SELECT hu.value FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         ORDER BY hu.clock DESC LIMIT 1) as current_uptime_seconds,
-        -- Last restart time = when uptime last dropped below 300 seconds
-        (SELECT FROM_UNIXTIME(hu.clock)
-         FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value < 300
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-         ORDER BY hu.clock ASC LIMIT 1) as last_restart_time,
-        -- Number of restarts in 30 days
-        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hu.clock)))
-         FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value < 300
-         AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as restart_count,
-        -- Real availability % over 30 days = 100 - (total detected downtime / 30 days),
-        -- computed once for all items below and joined in by itemid.
-        COALESCE(avail.availability_pct, 100) as availability_pct
-      FROM items i
-      JOIN hosts h ON h.hostid = i.hostid
-      LEFT JOIN (
-        SELECT
-          itemid,
-          ROUND(100 * (1 - LEAST(1, SUM(GREATEST(0, (clock - value) - prev_clock)) / (30 * 24 * 3600))), 1) as availability_pct
-        FROM (
-          SELECT
-            itemid,
-            clock,
-            value,
-            LAG(clock) OVER (PARTITION BY itemid ORDER BY clock) AS prev_clock,
-            LAG(value) OVER (PARTITION BY itemid ORDER BY clock) AS prev_value
-          FROM history_uint
-          WHERE itemid IN (?)
-            AND clock >= UNIX_TIMESTAMP() - (30 * 24 * 3600)
-        ) w
-        WHERE value < prev_value
-        GROUP BY itemid
-      ) avail ON avail.itemid = i.itemid
-      WHERE i.itemid IN (?)
-      ORDER BY h.name
-    `,
-      [ids, ids],
+  // Live per-request: 3 correlated scalar subqueries have been fine at this
+  // scope. Availability is heavier (window function over raw history), so
+  // it's computed on the cron cache below instead, per-item, like SFP/switch
+  // stats — not as a live join across all items.
+  getUptimeStats(): unknown[] {
+    return this.uptimeStatsCache;
+  }
+
+  private async computeUptimeStats(): Promise<unknown[]> {
+    const items: any[] = await this.zabbixDataSource.query(
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */
+         i.itemid, h.name as host
+       FROM items i
+       JOIN hosts h ON h.hostid = i.hostid
+       WHERE i.key_ = 'system.uptime'
+         AND h.status = 0
+         AND i.status = 0
+       ORDER BY h.name`,
     );
+
+    const results: {
+      host: string;
+      itemid: number;
+      current_uptime_seconds: number;
+      last_restart_time: string | null;
+      restart_count: number;
+      availability_pct: number;
+    }[] = [];
+
+    for (const item of items) {
+      const itemid = Number(item.itemid);
+      const latest = await this.latestHistoryUint(itemid);
+      const from =
+        (latest?.clock ?? Math.floor(Date.now() / 1000)) - 30 * 24 * 3600;
+
+      const restartRows: any[] = await this.zabbixDataSource.query(
+        `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+           MIN(FROM_UNIXTIME(clock)) as first_restart_time,
+           COUNT(DISTINCT DATE(FROM_UNIXTIME(clock))) as restart_count
+         FROM history_uint
+         WHERE itemid = ? AND value < 300 AND clock >= ?`,
+        [itemid, from],
+      );
+      const restartAgg = (restartRows[0] ?? {}) as {
+        first_restart_time: Date | string | null;
+        restart_count: number | string;
+      };
+
+      // Estimate downtime per restart as (boot instant) - (last sample seen
+      // before it), where boot instant = clock - value of the first sample
+      // of the new session. Scoped to one item so the window-function scan
+      // stays small; runs only on the 2-min cron refresh, never per-request.
+      const downtimeRows: any[] = await this.zabbixDataSource.query(
+        `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+           COALESCE(SUM(GREATEST(0, (clock - value) - prev_clock)), 0) as downtime_seconds
+         FROM (
+           SELECT clock, value,
+             LAG(clock) OVER (ORDER BY clock) AS prev_clock,
+             LAG(value) OVER (ORDER BY clock) AS prev_value
+           FROM history_uint
+           WHERE itemid = ? AND clock >= ?
+         ) w
+         WHERE value < prev_value`,
+        [itemid, from],
+      );
+      const downtimeSeconds = Number(downtimeRows[0]?.downtime_seconds ?? 0);
+      const availabilityPct =
+        Math.round(
+          100 * (1 - Math.min(1, downtimeSeconds / (30 * 24 * 3600))) * 10,
+        ) / 10;
+
+      results.push({
+        host: String(item.host),
+        itemid,
+        current_uptime_seconds: latest ? Number(latest.value) : 0,
+        last_restart_time: restartAgg.first_restart_time
+          ? String(restartAgg.first_restart_time)
+          : null,
+        restart_count: Number(restartAgg.restart_count ?? 0),
+        availability_pct: availabilityPct,
+      });
+    }
+
+    return results;
   }
 
   async getUptimeHistory(
