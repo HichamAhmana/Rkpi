@@ -215,6 +215,15 @@ const PdfReport: React.FC = () => {
   const avgAgentAvail = agentData.length > 0
     ? agentData.reduce((s, a) => s + Number(a.availability_pct), 0) / agentData.length : 0;
 
+  // Real server uptime availability (100 − downtime ÷ 30 days), averaged
+  // across servers — same number as the dashboard's uptime ring per card.
+  const serverUptimeVals = uptimeData
+    .map(u => Number(u.availability_pct))
+    .filter(v => !isNaN(v));
+  const avgServerUptime = serverUptimeVals.length > 0
+    ? serverUptimeVals.reduce((s, v) => s + v, 0) / serverUptimeVals.length
+    : null;
+
   // Count-based availability rates (count meeting threshold ÷ total × 100) — distinct
   // from avgAgentAvail above, which averages each agent's own % rather than counting them.
   const agentAvailCount = agentData.filter(a => Number(a.availability_pct) >= 99).length;
@@ -244,15 +253,29 @@ const PdfReport: React.FC = () => {
       });
     });
     const u = uptimeData.find(x => x.host === srv);
-    if (u) rows.push({
-      server: srv,
-      indicator: 'Redémarrages (Uptime)',
-      value: u.restart_count === 0 ? '0 redémarrage' : `${u.restart_count} redém.`,
-      ok: u.restart_count === 0,
-      comment: u.restart_count === 0
-        ? 'Aucun redémarrage visible sur 30 jours.'
-        : `Chute de l'uptime détectée${u.last_restart_time ? ` vers le ${new Date(u.last_restart_time).toLocaleDateString('fr-FR')}` : ''}.`,
-    });
+    if (u) {
+      const uptimeAvail = Number(u.availability_pct);
+      if (!isNaN(uptimeAvail)) rows.push({
+        server: srv,
+        indicator: 'Disponibilité serveur (30j)',
+        value: `${uptimeAvail.toFixed(1)}%`,
+        ok: uptimeAvail >= 99,
+        comment: uptimeAvail >= 99.9
+          ? 'Serveur disponible quasi en continu sur 30 jours.'
+          : uptimeAvail >= 99
+            ? 'Brèves indisponibilités liées aux redémarrages.'
+            : "Temps d'arrêt cumulé notable — à investiguer.",
+      });
+      rows.push({
+        server: srv,
+        indicator: 'Redémarrages (Uptime)',
+        value: u.restart_count === 0 ? '0 redémarrage' : `${u.restart_count} redém.`,
+        ok: u.restart_count === 0,
+        comment: u.restart_count === 0
+          ? 'Aucun redémarrage visible sur 30 jours.'
+          : `Chute de l'uptime détectée${u.last_restart_time ? ` vers le ${new Date(u.last_restart_time).toLocaleDateString('fr-FR')}` : ''}.`,
+      });
+    }
     const a = agentData.find(x => x.host === srv);
     if (a) {
       const avail = Number(a.availability_pct);
@@ -428,23 +451,30 @@ const PdfReport: React.FC = () => {
           </div>
 
           {/* Global KPI Strip */}
-          {totalServicesMonitored > 0 && (
+          {totalServicesMonitored > 0 && (() => {
+            const globalTiles = [
+              { value: `${allServers.length}`, label: 'Serveurs supervisés', color: NAVY },
+              { value: `${totalServicesMonitored}`, label: 'Services applicatifs', color: BRAND.tealBlue },
+              {
+                value: `${globalAvailPct}%`,
+                label: 'Services en ligne',
+                color: globalAvailPct >= 90 ? BRAND.green : '#D97706',
+              },
+              ...(avgServerUptime !== null ? [{
+                value: `${avgServerUptime.toFixed(1)}%`,
+                label: 'Uptime Serveurs (moy.)',
+                color: avgServerUptime >= 99 ? BRAND.green : '#D97706',
+              }] : []),
+              {
+                value: `${avgAgentAvail.toFixed(1)}%`,
+                label: 'Agent Zabbix (moy.)',
+                color: avgAgentAvail >= 99 ? BRAND.green : '#D97706',
+              },
+            ];
+            return (
             <div className="mt-5 mb-5">
-              <div className="grid grid-cols-4 gap-3">
-                {[
-                  { value: allServers.length, label: 'Serveurs supervisés', color: NAVY },
-                  { value: totalServicesMonitored, label: 'Services applicatifs', color: BRAND.tealBlue },
-                  {
-                    value: `${globalAvailPct}%`,
-                    label: 'Services en ligne',
-                    color: globalAvailPct >= 90 ? BRAND.green : '#D97706',
-                  },
-                  {
-                    value: `${avgAgentAvail.toFixed(1)}%`,
-                    label: 'Agent Zabbix (moy.)',
-                    color: avgAgentAvail >= 99 ? BRAND.green : '#D97706',
-                  },
-                ].map(({ value, label, color }) => (
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${globalTiles.length}, minmax(0, 1fr))` }}>
+                {globalTiles.map(({ value, label, color }) => (
                   <div
                     key={label}
                     className="rounded-xl p-4 text-center"
@@ -457,10 +487,12 @@ const PdfReport: React.FC = () => {
               </div>
               <p className="text-[9.5px] mt-2.5 leading-relaxed" style={{ color: '#94A3B8' }}>
                 Méthode de calcul — <strong>Services en ligne</strong> : services opérationnels sans incident sur 30 jours ({globalRunning}) ÷ services supervisés ({totalServicesMonitored}) × 100.{' '}
+                <strong>Uptime Serveurs (moy.)</strong> : moyenne des disponibilités serveur sur 30 jours (100% − temps d'arrêt cumulé ÷ 30 jours), chaque serveur pesant à part égale.{' '}
                 <strong>Agent Zabbix (moy.)</strong> : moyenne des disponibilités par agent sur 30 jours (contrôles OK ÷ contrôles totaux × 100), chaque agent pesant à part égale.
               </p>
             </div>
-          )}
+            );
+          })()}
 
           {/* TOC cards */}
           <div

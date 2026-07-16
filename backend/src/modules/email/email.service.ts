@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
@@ -26,8 +27,15 @@ export class EmailService {
     });
   }
 
-  async sendReportEmail(pdfBase64: string, filename: string, monthLabel: string): Promise<void> {
-    const to = this.configService.get<string>('REPORT_EMAIL', 'hichamahmana@gmail.com');
+  async sendReportEmail(
+    pdfBase64: string,
+    filename: string,
+    monthLabel: string,
+  ): Promise<void> {
+    const to = this.configService.get<string>(
+      'REPORT_EMAIL',
+      'hichamahmana@gmail.com',
+    );
     const from = `"RKpi Dashboard" <${this.configService.get<string>('SMTP_USER')}>`;
     const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
@@ -36,7 +44,9 @@ export class EmailService {
       to,
       subject: `Rapport KPI Mensuel – ${monthLabel}`,
       html: this.buildCoverEmail(monthLabel),
-      attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
+      attachments: [
+        { filename, content: pdfBuffer, contentType: 'application/pdf' },
+      ],
     });
 
     this.logger.log(`Report email sent to ${to} for ${monthLabel}`);
@@ -54,21 +64,32 @@ export class EmailService {
     this.logger.log(`Running monthly cron for period: ${prevMonth}`);
 
     if (!this.glpiService) {
-      this.logger.warn('GLPI is not configured (DB_GLPI_HOST unset) — skipping monthly report.');
+      this.logger.warn(
+        'GLPI is not configured (DB_GLPI_HOST unset) — skipping monthly report.',
+      );
       return;
     }
 
     try {
-      const [glpiSummary, volumeData, uptimeStats, agentStats, switchStats] = await Promise.all([
+      const [glpiSummary, agentStats] = await Promise.all([
         this.glpiService.getKpiSummary(prevMonth),
-        this.glpiService.getTicketVolume(),
-        this.zabbixService.getUptimeStats(),
         this.zabbixService.getAgentAvailabilityStats(),
-        this.zabbixService.getSwitchUptimeStats(),
       ]);
+      // These two are served from in-memory cron caches, so they're sync.
+      const uptimeStats = this.zabbixService.getUptimeStats();
+      const switchStats = this.zabbixService.getSwitchUptimeStats();
 
-      const html = this.buildMonthlyHtmlEmail(prevMonth, glpiSummary, uptimeStats as any[], agentStats as any[], switchStats as any[]);
-      const to = this.configService.get<string>('REPORT_EMAIL', 'hichamahmana@gmail.com');
+      const html = this.buildMonthlyHtmlEmail(
+        prevMonth,
+        glpiSummary,
+        uptimeStats as any[],
+        agentStats as any[],
+        switchStats as any[],
+      );
+      const to = this.configService.get<string>(
+        'REPORT_EMAIL',
+        'hichamahmana@gmail.com',
+      );
 
       await this.transporter.sendMail({
         from: `"RKpi Dashboard" <${this.configService.get<string>('SMTP_USER')}>`,
@@ -116,8 +137,18 @@ export class EmailService {
   ): string {
     const fmtMonth = (m: string) => {
       const months: Record<string, string> = {
-        '01':'Janvier','02':'Février','03':'Mars','04':'Avril','05':'Mai','06':'Juin',
-        '07':'Juillet','08':'Août','09':'Septembre','10':'Octobre','11':'Novembre','12':'Décembre',
+        '01': 'Janvier',
+        '02': 'Février',
+        '03': 'Mars',
+        '04': 'Avril',
+        '05': 'Mai',
+        '06': 'Juin',
+        '07': 'Juillet',
+        '08': 'Août',
+        '09': 'Septembre',
+        '10': 'Octobre',
+        '11': 'Novembre',
+        '12': 'Décembre',
       };
       const [y, mo] = m.split('-');
       return `${months[mo] || mo} ${y}`;
@@ -126,24 +157,100 @@ export class EmailService {
     const label = fmtMonth(month);
     const targetMet = glpi.resolutionRate >= 90;
 
-    const uptimeRows = (uptimes || []).map((u: any) => `
+    // Fleet-wide percentages — same numbers the dashboard cards show,
+    // averaged across all monitored hosts (each host weighs equally).
+    const avg = (vals: number[]): number | null =>
+      vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+    const pctColor = (v: number): string =>
+      v >= 99 ? '#3DBE7A' : v >= 95 ? '#F59E0B' : '#EF4444';
+
+    const serverAvail = avg(
+      (uptimes || [])
+        .map((u: any) => Number(u.availability_pct))
+        .filter((v: number) => !isNaN(v)),
+    );
+    const agentAvail = avg(
+      (agents || [])
+        .map((a: any) => Number(a.availability_pct))
+        .filter((v: number) => !isNaN(v)),
+    );
+    const totalRestarts = (uptimes || []).reduce(
+      (s: number, u: any) => s + (Number(u.restart_count) || 0),
+      0,
+    );
+    const stableSwitches = (switches || []).filter(
+      (s: any) => (Number(s.restart_count) || 0) === 0,
+    ).length;
+
+    const overviewTiles = [
+      serverAvail !== null
+        ? {
+            label: 'Uptime Serveurs (moy.)',
+            value: `${serverAvail.toFixed(1)}%`,
+            color: pctColor(serverAvail),
+          }
+        : null,
+      agentAvail !== null
+        ? {
+            label: 'Agents Zabbix (moy.)',
+            value: `${agentAvail.toFixed(1)}%`,
+            color: pctColor(agentAvail),
+          }
+        : null,
+      {
+        label: 'Redémarrages Serveurs',
+        value: `${totalRestarts}`,
+        color: totalRestarts > 0 ? '#EF4444' : '#3DBE7A',
+      },
+      (switches || []).length > 0
+        ? {
+            label: 'Switches Stables',
+            value: `${stableSwitches}/${(switches || []).length}`,
+            color:
+              stableSwitches === (switches || []).length
+                ? '#3DBE7A'
+                : '#F59E0B',
+          }
+        : null,
+    ].filter(
+      (t): t is { label: string; value: string; color: string } => t !== null,
+    );
+
+    const uptimeRows = (uptimes || [])
+      .map((u: any) => {
+        const availNum = Number(u.availability_pct);
+        const availCell = isNaN(availNum)
+          ? '<td style="padding:10px 12px;color:#94A3B8;">—</td>'
+          : `<td style="padding:10px 12px;color:${pctColor(availNum)};font-weight:700;">${availNum.toFixed(1)}%</td>`;
+        return `
       <tr style="border-bottom:1px solid #F1F5F9;">
         <td style="padding:10px 12px;font-weight:600;color:#0F172A;">${u.host || u.host_name || '—'}</td>
+        ${availCell}
         <td style="padding:10px 12px;color:#475569;">${Math.floor((u.current_uptime_seconds || 0) / 86400)} jours</td>
         <td style="padding:10px 12px;color:${(u.restart_count || 0) > 0 ? '#EF4444' : '#059669'};font-weight:600;">${u.restart_count || 0}</td>
-      </tr>`).join('');
+      </tr>`;
+      })
+      .join('');
 
-    const agentRows = (agents || []).map((a: any) => `
+    const agentRows = (agents || [])
+      .map(
+        (a: any) => `
       <tr style="border-bottom:1px solid #F1F5F9;">
         <td style="padding:10px 12px;font-weight:600;color:#0F172A;">${a.host || a.host_name || '—'}</td>
         <td style="padding:10px 12px;color:${Number(a.availability_pct || 0) >= 99 ? '#059669' : '#D97706'};font-weight:600;">${Number(a.availability_pct || 0).toFixed(2)}%</td>
-      </tr>`).join('');
+      </tr>`,
+      )
+      .join('');
 
-    const switchRows = (switches || []).map((s: any) => `
+    const switchRows = (switches || [])
+      .map(
+        (s: any) => `
       <tr style="border-bottom:1px solid #F1F5F9;">
         <td style="padding:10px 12px;font-weight:600;color:#0F172A;">${s.switch_name || '—'}</td>
         <td style="padding:10px 12px;color:#475569;">${((s.current_uptime_seconds || 0) / (7 * 86400)).toFixed(1)} semaines</td>
-      </tr>`).join('');
+      </tr>`,
+      )
+      .join('');
 
     return `
       <div style="font-family:Inter,Arial,sans-serif;max-width:640px;margin:0 auto;background:#F8FAFC;padding:32px 0;">
@@ -153,20 +260,62 @@ export class EmailService {
         </div>
         <div style="background:white;border:1px solid #E2E8F0;border-top:none;padding:28px 32px;">
 
+          <!-- Vue d'ensemble Infrastructure -->
+          <h2 style="font-size:15px;color:#0F172A;margin:0 0 16px;border-bottom:2px solid #0F172A;padding-bottom:8px;">Vue d'ensemble Infrastructure (30 jours)</h2>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            ${overviewTiles
+              .map(
+                (k) => `
+              <div style="flex:1;min-width:110px;background:#F8FAFC;border:1px solid #E2E8F0;border-top:3px solid ${k.color};border-radius:8px;padding:12px;">
+                <p style="margin:0 0 4px;font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">${k.label}</p>
+                <p style="margin:0;font-size:22px;font-weight:800;color:#0F172A;">${k.value}</p>
+              </div>`,
+              )
+              .join('')}
+          </div>
+          <p style="color:#94A3B8;font-size:11px;margin:0 0 24px;line-height:1.5;">
+            <strong>Uptime Serveurs</strong> : moyenne des disponibilités serveur sur 30 jours (100% − temps d'arrêt cumulé ÷ 30 jours).
+            <strong>Agents Zabbix</strong> : moyenne des disponibilités agent (contrôles OK ÷ contrôles totaux), chaque hôte pesant à part égale.
+          </p>
+
           <!-- GLPI KPIs -->
           <h2 style="font-size:15px;color:#0F172A;margin:0 0 16px;border-bottom:2px solid #2B5BA8;padding-bottom:8px;">Plateforme GLPI – ${label}</h2>
           <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
             ${[
-              { label: 'Tickets Créés', value: glpi.ticketsCreated, color: '#2B5BA8' },
-              { label: 'Tickets Clos', value: glpi.ticketsClosed, color: '#3DBE7A' },
-              { label: 'Taux Résolution', value: `${glpi.resolutionRate.toFixed(1)}%`, color: targetMet ? '#3DBE7A' : '#EF4444' },
-              { label: 'Time to Own', value: `${glpi.timeToOwn.toFixed(1)} h`, color: '#F59E0B' },
-              { label: 'Time to Close', value: `${glpi.timeToClose.toFixed(1)} h`, color: '#E24A8D' },
-            ].map(k => `
+              {
+                label: 'Tickets Créés',
+                value: glpi.ticketsCreated,
+                color: '#2B5BA8',
+              },
+              {
+                label: 'Tickets Clos',
+                value: glpi.ticketsClosed,
+                color: '#3DBE7A',
+              },
+              {
+                label: 'Taux Résolution',
+                value: `${Number(glpi.resolutionRate).toFixed(1)}%`,
+                color: targetMet ? '#3DBE7A' : '#EF4444',
+              },
+              {
+                label: 'Time to Own',
+                value: `${Number(glpi.timeToOwn).toFixed(1)} h`,
+                color: '#F59E0B',
+              },
+              {
+                label: 'Time to Close',
+                value: `${Number(glpi.timeToClose).toFixed(1)} h`,
+                color: '#E24A8D',
+              },
+            ]
+              .map(
+                (k) => `
               <div style="flex:1;min-width:110px;background:#F8FAFC;border:1px solid #E2E8F0;border-top:3px solid ${k.color};border-radius:8px;padding:12px;">
                 <p style="margin:0 0 4px;font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">${k.label}</p>
                 <p style="margin:0;font-size:22px;font-weight:800;color:#0F172A;">${k.value}</p>
-              </div>`).join('')}
+              </div>`,
+              )
+              .join('')}
           </div>
 
           <!-- Zabbix Uptime -->
@@ -174,10 +323,11 @@ export class EmailService {
           <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;">
             <thead><tr style="background:#F1F5F9;">
               <th style="padding:10px 12px;text-align:left;color:#64748B;font-weight:600;">Serveur</th>
+              <th style="padding:10px 12px;text-align:left;color:#64748B;font-weight:600;">Disponibilité (30j)</th>
               <th style="padding:10px 12px;text-align:left;color:#64748B;font-weight:600;">Uptime Courant</th>
               <th style="padding:10px 12px;text-align:left;color:#64748B;font-weight:600;">Redémarrages</th>
             </tr></thead>
-            <tbody>${uptimeRows || '<tr><td colspan="3" style="padding:12px;color:#94A3B8;">Aucune donnée</td></tr>'}</tbody>
+            <tbody>${uptimeRows || '<tr><td colspan="4" style="padding:12px;color:#94A3B8;">Aucune donnée</td></tr>'}</tbody>
           </table>
 
           <!-- Agent Availability -->
