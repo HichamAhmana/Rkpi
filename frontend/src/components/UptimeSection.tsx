@@ -64,12 +64,6 @@ const formatUptimeShort = (seconds: number): string => {
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
-// Uptime percentage for visual ring (based on 30-day period)
-const getUptimePercentage = (seconds: number): number => {
-  const thirtyDays = 30 * 86400;
-  return Math.min(100, (seconds / thirtyDays) * 100);
-};
-
 /* ─────────────────────── Animated Ring ─────────────────────── */
 const UptimeRing: React.FC<{ percentage: number; color: string; size?: number }> = ({
   percentage,
@@ -530,7 +524,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
   const statusBg = isOffline || isRecentRestart ? '#FEF2F2' : '#F0FDF4';
 
   const uptime = formatUptimeHero(stat.current_uptime_seconds);
-  const uptimePercent = getUptimePercentage(stat.current_uptime_seconds);
+  const uptimePercent = stat.availability_pct;
 
   // Pre-fetch 30d history
   const defaultHistoryKey = `${stat.itemid}-preset-30`;
@@ -627,7 +621,7 @@ const UptimeCard: React.FC<UptimeCardProps> = ({
             <p className="text-[15px] text-[#94A3B8]">{bootDateStr}</p>
             {/* Calculation explanation */}
             <p className="text-[12px] text-label mt-1">
-              Ring {Math.round(uptimePercent)}% = current uptime ÷ 30 days × 100
+              Ring {Math.round(uptimePercent)}% = availability over the last 30 days
             </p>
           </div>
         </div>

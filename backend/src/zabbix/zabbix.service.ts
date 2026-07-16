@@ -451,7 +451,23 @@ export class ZabbixService implements OnModuleInit {
          WHERE hu.itemid = i.itemid
          AND hu.value < 300
          AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as restart_count
+        ) as restart_count,
+        -- Real availability % over 30 days = 100 - (total detected downtime / 30 days).
+        -- Downtime per restart is estimated as (boot instant) - (last sample seen before it),
+        -- where boot instant = clock - value of the first sample of the new session.
+        (SELECT ROUND(100 * (1 - LEAST(1, COALESCE(SUM(GREATEST(0, (clock - value) - prev_clock)), 0) / (30 * 24 * 3600))), 1)
+         FROM (
+           SELECT
+             clock,
+             value,
+             LAG(clock) OVER (ORDER BY clock) AS prev_clock,
+             LAG(value) OVER (ORDER BY clock) AS prev_value
+           FROM history_uint
+           WHERE itemid = i.itemid
+             AND clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
+         ) w
+         WHERE value < prev_value
+        ) as availability_pct
       FROM items i
       JOIN hosts h ON h.hostid = i.hostid
       WHERE i.itemid IN (?)

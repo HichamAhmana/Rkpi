@@ -116,6 +116,7 @@ export interface UptimeStat {
   current_uptime_seconds: number;
   last_restart_time: string | null;
   restart_count: number;
+  availability_pct: number;
 }
 
 export interface UptimeHistoryPoint {
