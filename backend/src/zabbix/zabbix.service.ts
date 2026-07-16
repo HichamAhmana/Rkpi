@@ -476,25 +476,19 @@ export class ZabbixService implements OnModuleInit {
       const from =
         (latest?.clock ?? Math.floor(Date.now() / 1000)) - 30 * 24 * 3600;
 
-      const restartRows: any[] = await this.zabbixDataSource.query(
+      // Restarts, last boot, and downtime all come from one detection: the
+      // uptime counter dropping between consecutive samples. (The old
+      // value<300 restart check missed reboots whenever polling didn't catch
+      // the first minutes of a new session, so restart_count could say 0
+      // while availability showed real downtime — contradictory reports.)
+      // Downtime per restart = (boot instant) - (last sample before it),
+      // where boot instant = clock - value of the drop sample. Scoped to one
+      // item so the window-function scan stays small; runs only on the 2-min
+      // cron refresh, never per-request.
+      const dropRows: any[] = await this.zabbixDataSource.query(
         `SELECT /*+ MAX_EXECUTION_TIME(15000) */
-           MIN(FROM_UNIXTIME(clock)) as first_restart_time,
-           COUNT(DISTINCT DATE(FROM_UNIXTIME(clock))) as restart_count
-         FROM history_uint
-         WHERE itemid = ? AND value < 300 AND clock >= ?`,
-        [itemid, from],
-      );
-      const restartAgg = (restartRows[0] ?? {}) as {
-        first_restart_time: Date | string | null;
-        restart_count: number | string;
-      };
-
-      // Estimate downtime per restart as (boot instant) - (last sample seen
-      // before it), where boot instant = clock - value of the first sample
-      // of the new session. Scoped to one item so the window-function scan
-      // stays small; runs only on the 2-min cron refresh, never per-request.
-      const downtimeRows: any[] = await this.zabbixDataSource.query(
-        `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+           COUNT(*) as restart_count,
+           FROM_UNIXTIME(MAX(clock - value)) as last_restart_time,
            COALESCE(SUM(GREATEST(0, (clock - value) - prev_clock)), 0) as downtime_seconds
          FROM (
            SELECT clock, value,
@@ -506,7 +500,13 @@ export class ZabbixService implements OnModuleInit {
          WHERE value < prev_value`,
         [itemid, from],
       );
-      const downtimeSeconds = Number(downtimeRows[0]?.downtime_seconds ?? 0);
+      const drops = (dropRows[0] ?? {}) as {
+        restart_count: number | string | null;
+        last_restart_time: Date | string | null;
+        downtime_seconds: number | string | null;
+      };
+
+      const downtimeSeconds = Number(drops.downtime_seconds ?? 0);
       const availabilityPct =
         Math.round(
           100 * (1 - Math.min(1, downtimeSeconds / (30 * 24 * 3600))) * 10,
@@ -516,10 +516,10 @@ export class ZabbixService implements OnModuleInit {
         host: String(item.host),
         itemid,
         current_uptime_seconds: latest ? Number(latest.value) : 0,
-        last_restart_time: restartAgg.first_restart_time
-          ? String(restartAgg.first_restart_time)
+        last_restart_time: drops.last_restart_time
+          ? String(drops.last_restart_time)
           : null,
-        restart_count: Number(restartAgg.restart_count ?? 0),
+        restart_count: Number(drops.restart_count ?? 0),
         availability_pct: availabilityPct,
       });
     }
@@ -547,7 +547,10 @@ export class ZabbixService implements OnModuleInit {
         DATE(FROM_UNIXTIME(clock)) as day,
         MAX(value) as max_uptime_seconds,
         MIN(value) as min_uptime_seconds,
-        CASE WHEN MIN(value) < 300 THEN 1 ELSE 0 END as had_restart
+        -- A day had a restart if the most recent boot instant (clock - value)
+        -- seen that day falls within the day itself. Unlike value<300 this
+        -- also catches reboots that polling only sampled minutes/hours later.
+        CASE WHEN MAX(clock - value) >= UNIX_TIMESTAMP(DATE(FROM_UNIXTIME(MIN(clock)))) THEN 1 ELSE 0 END as had_restart
       FROM history_uint
       WHERE itemid = ?
         AND clock >= ?

@@ -235,15 +235,56 @@ const PdfReport: React.FC = () => {
   const sfpStableCount = sfpData.filter(p => Number(p.down_count) === 0).length;
   const sfpStablePct = sfpData.length > 0 ? (sfpStableCount / sfpData.length) * 100 : 0;
 
-  type KpiRow = { server: string; indicator: string; value: string; comment: string; ok: boolean };
-  const serviceKpiRows: KpiRow[] = allServers.flatMap(srv => {
+  // Grouped per server so the table reads as one block per machine:
+  // server health first (availability, restarts, agent), then its services.
+  type KpiRow = { indicator: string; value: string; comment: string; ok: boolean };
+  const kpiRowsByServer: { server: string; rows: KpiRow[] }[] = allServers.map(srv => {
     const rows: KpiRow[] = [];
+    const u = uptimeData.find(x => x.host === srv);
+    if (u) {
+      const uptimeAvail = Number(u.availability_pct);
+      if (!isNaN(uptimeAvail)) {
+        const downHours = ((100 - uptimeAvail) / 100) * 720;
+        rows.push({
+          indicator: 'Disponibilité serveur (30j)',
+          value: `${uptimeAvail.toFixed(1)}%`,
+          ok: uptimeAvail >= 99,
+          comment: uptimeAvail >= 99.9
+            ? 'Serveur disponible quasi en continu sur 30 jours.'
+            : uptimeAvail >= 99
+              ? `Environ ${downHours < 1 ? `${Math.round(downHours * 60)} min` : `${downHours.toFixed(1)} h`} d'arrêt cumulé sur 30 jours (voir redémarrages).`
+              : `Environ ${downHours.toFixed(1)} h d'arrêt cumulé sur 30 jours — à investiguer.`,
+        });
+      }
+      rows.push({
+        indicator: 'Redémarrages serveur (30j)',
+        value: u.restart_count === 0 ? '0 redémarrage' : `${u.restart_count} redémarrage(s)`,
+        ok: u.restart_count === 0,
+        comment: u.restart_count === 0
+          ? 'Aucun redémarrage détecté sur 30 jours.'
+          : `Dernier redémarrage${u.last_restart_time ? ` le ${new Date(u.last_restart_time).toLocaleDateString('fr-FR')}` : ''}.`,
+      });
+    }
+    const a = agentData.find(x => x.host === srv);
+    if (a) {
+      const avail = Number(a.availability_pct);
+      const ok = avail >= 99;
+      rows.push({
+        indicator: 'Disponibilité agent Zabbix',
+        value: `${avail.toFixed(2)}%`,
+        ok,
+        comment: avail >= 99.5
+          ? 'Agent de supervision joignable quasi en continu.'
+          : avail >= 99
+            ? "Brèves coupures de communication avec l'agent de supervision."
+            : "Agent de supervision injoignable par moments — mesure la communication Zabbix, distincte de la disponibilité du serveur ci-dessus.",
+      });
+    }
     const srvServices = serviceData.find(s => s.server_name === srv);
     srvServices?.services.forEach(svc => {
       const name = cleanSvcName(svc.service_name);
       const ok = svc.incident_days === 0;
       rows.push({
-        server: srv,
         indicator: `Arrêts — ${name}`,
         value: ok ? '0 arrêt' : `${svc.incident_days} jour(s)`,
         ok,
@@ -252,48 +293,8 @@ const PdfReport: React.FC = () => {
           : `Service interrompu ${svc.incident_days} jour(s)${svc.last_incident ? ` — dernier : ${new Date(svc.last_incident).toLocaleDateString('fr-FR')}` : ''}.`,
       });
     });
-    const u = uptimeData.find(x => x.host === srv);
-    if (u) {
-      const uptimeAvail = Number(u.availability_pct);
-      if (!isNaN(uptimeAvail)) rows.push({
-        server: srv,
-        indicator: 'Disponibilité serveur (30j)',
-        value: `${uptimeAvail.toFixed(1)}%`,
-        ok: uptimeAvail >= 99,
-        comment: uptimeAvail >= 99.9
-          ? 'Serveur disponible quasi en continu sur 30 jours.'
-          : uptimeAvail >= 99
-            ? 'Brèves indisponibilités liées aux redémarrages.'
-            : "Temps d'arrêt cumulé notable — à investiguer.",
-      });
-      rows.push({
-        server: srv,
-        indicator: 'Redémarrages (Uptime)',
-        value: u.restart_count === 0 ? '0 redémarrage' : `${u.restart_count} redém.`,
-        ok: u.restart_count === 0,
-        comment: u.restart_count === 0
-          ? 'Aucun redémarrage visible sur 30 jours.'
-          : `Chute de l'uptime détectée${u.last_restart_time ? ` vers le ${new Date(u.last_restart_time).toLocaleDateString('fr-FR')}` : ''}.`,
-      });
-    }
-    const a = agentData.find(x => x.host === srv);
-    if (a) {
-      const avail = Number(a.availability_pct);
-      const ok = avail >= 99;
-      rows.push({
-        server: srv,
-        indicator: 'Disponibilité agent Zabbix',
-        value: `${avail.toFixed(2)}%`,
-        ok,
-        comment: avail >= 99.5
-          ? 'Disponibilité quasi constante.'
-          : avail >= 99
-            ? 'Indisponibilité brève corrélée au redémarrage.'
-            : 'Indisponibilité notable à investiguer.',
-      });
-    }
-    return rows;
-  });
+    return { server: srv, rows };
+  }).filter(g => g.rows.length > 0);
 
   // Network KPI rows
   type NetRow = { equip: string; indicator: string; obs: string; comment: string };
@@ -548,19 +549,25 @@ const PdfReport: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {serviceKpiRows.map((row, i) => (
-                <tr key={i} style={{ backgroundColor: rowBg(i) }}>
-                  <td className={TDB}>{row.server}</td>
-                  <td className={TDR}>{row.indicator}</td>
-                  <td className={TDR}>
-                    <span className="inline-flex items-center gap-1">
-                      {row.ok ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                      {row.value}
-                    </span>
-                  </td>
-                  <td className={TDR}>{row.comment}</td>
-                </tr>
-              ))}
+              {kpiRowsByServer.map((grp, gi) =>
+                grp.rows.map((row, ri) => (
+                  <tr key={`${grp.server}-${ri}`} style={{ backgroundColor: gi % 2 === 0 ? '#ffffff' : '#F8FAFC' }}>
+                    {ri === 0 && (
+                      <td className={TDB} rowSpan={grp.rows.length} style={{ verticalAlign: 'top' }}>
+                        {grp.server}
+                      </td>
+                    )}
+                    <td className={TDR}>{row.indicator}</td>
+                    <td className={TDR}>
+                      <span className="inline-flex items-center gap-1">
+                        {row.ok ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                        {row.value}
+                      </span>
+                    </td>
+                    <td className={TDR}>{row.comment}</td>
+                  </tr>
+                )),
+              )}
             </tbody>
           </table>
 
