@@ -291,7 +291,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
   const currentStatusLabel = lastValue === 1 ? 'Up' : lastValue === 2 ? 'Down' : '—';
   const currentStatusDot = lastValue === 1 ? '#3DBE7A' : '#EF4444';
 
-  const interpretationBullet1 = `• Port SFP ${portNum} ${currentStatusLabel} (${lastValue}) avec last/min/avg/max = ${lastValue ?? '—'} / ${minValue ?? '—'} / ${avgValue !== null ? Number(avgValue).toFixed(4) : '—'} / ${maxValue ?? '—'}.`;
+  const interpretationBullet1 = `• ${stat.host} — Port SFP ${portNum} ${currentStatusLabel} (${lastValue}) avec last/min/avg/max = ${lastValue ?? '—'} / ${minValue ?? '—'} / ${avgValue !== null ? Number(avgValue).toFixed(4) : '—'} / ${maxValue ?? '—'}.`;
   const interpretationBullet2 =
     downCount === 0
       ? '• Conclusion : liaison stable sur la période.'
@@ -367,7 +367,7 @@ const ExpandedSfpPanel: React.FC<ExpandedSfpPanelProps> = ({
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-4 gap-4">
             <div>
               <h4 className="text-[18px] font-semibold text-[#0F172A] mb-0.5">
-                Port {portNum} — Status History
+                {stat.host} — Port {portNum} — Status History
               </h4>
               <p className="text-[18px] text-[#94A3B8]">
                 1 = Up · 2 = Down · Flat green line = perfectly stable
@@ -562,7 +562,7 @@ const SfpPortCard: React.FC<SfpPortCardProps> = ({
             </div>
             <div>
               <h3 className="text-[18px] font-bold text-[#0F172A]">SFP Port {portNum}</h3>
-              <p className="text-[15px] text-[#94A3B8] font-medium uppercase tracking-wider">SW-1 Fibre Uplink</p>
+              <p className="text-[15px] text-[#94A3B8] font-medium uppercase tracking-wider">{stat.host} Fibre Uplink</p>
             </div>
           </div>
 
@@ -716,9 +716,9 @@ const SfpPortsSection: React.FC<SfpPortsSectionProps> = ({ data, isLoading = fal
     return (
       <div className="w-full">
         <div className="mb-4">
-          <h3 className="text-[18px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
+          <h3 className="text-[18px] font-semibold text-[#0F172A]">SFP Uplink Ports</h3>
           <p className="text-[15px] text-[#94A3B8] mt-0.5">
-            Ports 49 · 50 · 51 — Fibre uplink monitoring
+            Fibre uplink monitoring across monitored switches
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -743,9 +743,9 @@ const SfpPortsSection: React.FC<SfpPortsSectionProps> = ({ data, isLoading = fal
     <div className="w-full">
       {/* Section header */}
       <div className="mb-4">
-        <h3 className="text-[18px] font-semibold text-[#0F172A]">SW-1 — SFP Uplink Ports</h3>
+        <h3 className="text-[18px] font-semibold text-[#0F172A]">SFP Uplink Ports</h3>
         <p className="text-[15px] text-[#94A3B8] mt-0.5">
-          Ports 49 · 50 · 51 — Fibre uplink monitoring
+          Fibre uplink monitoring across monitored switches
         </p>
       </div>
 

@@ -319,8 +319,8 @@ const PdfReport: React.FC = () => {
       const down = Number(p.down_count);
       const stable = last === 1 && min === 1 && avg === 1 && max === 1;
       return {
-        equip: p.port_name,
-        indicator: 'Statut port SFP',
+        equip: p.host,
+        indicator: `Statut port SFP ${p.port_number}`,
         obs: `last=${last ?? '?'} / min=${min ?? '?'} / avg=${avg !== null ? avg.toFixed(1) : '?'} / max=${max ?? '?'}`,
         comment: stable
           ? 'Liaison SFP stable, aucune coupure visible.'

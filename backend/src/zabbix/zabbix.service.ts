@@ -651,15 +651,16 @@ export class ZabbixService implements OnModuleInit {
     }));
   }
 
-  // ─── SW-1 SFP Ports ───────────────────────────────────────────────
+  // ─── SFP Ports ──────────────────────────────────────────────────────
 
   getSfpPortsStats(): unknown[] {
     return this.sfpPortsCache;
   }
 
-  // SW1's SFP uplink ports are 49/50/51. Resolved by host name + item key
-  // (not item ID) so the lookup survives the host being re-created or
-  // re-discovered in Zabbix.
+  // SW1's SFP uplink ports are 49/50/51; remote-site switches (any SW*
+  // host ending in AQ or QVM) only expose port 49. Resolved by host name
+  // + item key (not item ID) so the lookup survives the host being
+  // re-created or re-discovered in Zabbix.
   private static readonly SFP_PORT_KEYS = [
     'ifOperStatus.49',
     'ifOperStatus.50',
@@ -668,18 +669,24 @@ export class ZabbixService implements OnModuleInit {
 
   private async computeSfpPortsStats(): Promise<unknown[]> {
     const items: any[] = await this.zabbixDataSource.query(
-      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, i.name, i.key_
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, i.name, i.key_, h.name AS host
        FROM items i
        JOIN hosts h ON h.hostid = i.hostid
-       WHERE h.name = 'SW1'
-         AND h.status = 0
+       WHERE h.status = 0
          AND i.status = 0
-         AND i.key_ IN (?)`,
+         AND (
+           (h.name = 'SW1' AND i.key_ IN (?))
+           OR (
+             (h.name LIKE 'SW%AQ' OR h.name LIKE 'SW%QVM')
+             AND i.key_ = 'ifOperStatus.49'
+           )
+         )`,
       [ZabbixService.SFP_PORT_KEYS],
     );
 
     const results: {
       port_name: string;
+      host: string;
       itemid: number;
       port_number: number;
       last_value: number | null;
@@ -711,6 +718,7 @@ export class ZabbixService implements OnModuleInit {
 
       results.push({
         port_name: String(item.name),
+        host: String(item.host),
         itemid: Number(item.itemid),
         port_number: Number(String(item.key_).replace('ifOperStatus.', '')),
         last_value: latest ? latest.value : null,
@@ -725,7 +733,13 @@ export class ZabbixService implements OnModuleInit {
       });
     }
 
-    results.sort((a, b) => a.port_number - b.port_number);
+    // Keep SW1's 3 uplinks together and first, then remaining switches
+    // alphabetically by host, each ordered by port number.
+    results.sort((a, b) => {
+      const aKey = a.host === 'SW1' ? `0-${a.port_number}` : `1-${a.host}-${a.port_number}`;
+      const bKey = b.host === 'SW1' ? `0-${b.port_number}` : `1-${b.host}-${b.port_number}`;
+      return aKey.localeCompare(bKey);
+    });
     return results;
   }
   async getSfpPortHistory(

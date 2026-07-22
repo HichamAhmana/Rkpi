@@ -209,7 +209,7 @@ const Dashboard: React.FC = () => {
         <AgentAvailabilitySection data={agentData} />
       </div>
 
-      {/* SW-1 SFP Uplink Ports */}
+      {/* SFP Uplink Ports */}
       <SfpPortsSection data={sfpData} isLoading={sfpLoading} />
 
       {/* Network Switches — Uptime & Availability */}

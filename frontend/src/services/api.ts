@@ -257,6 +257,7 @@ export const getUptimeAvailablePeriods = async (itemid: number): Promise<Availab
 
 export interface SfpPortStat {
   port_name: string;
+  host: string;
   itemid: number;
   port_number: number;
   last_value: number | string | null;
@@ -281,6 +282,7 @@ export const getSfpPortsStats = async (): Promise<SfpPortStat[]> => {
   const { data } = await api.get<any[]>('/sfp-ports-stats');
   return data.map((item) => ({
     port_name: item.port_name || '',
+    host: item.host || '',
     itemid: Number(item.itemid),
     port_number: Number(item.port_number),
     last_value: item.last_value !== null && item.last_value !== undefined ? Number(item.last_value) : null,
