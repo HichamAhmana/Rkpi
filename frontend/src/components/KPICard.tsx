@@ -118,10 +118,9 @@ const KPICard: React.FC<KPICardProps> = ({
 
         {/* Optional Contextual Description Meta Label */}
         {description && (
-          <div className="text-[18px] font-medium text-slate-400 font-sans tracking-normal border-t border-slate-100 pt-2.5 mt-0.5 flex items-center justify-between">
-            <span className="truncate">{description}</span>
-            <span className="w-1 h-1 rounded-full bg-slate-200 group-hover:bg-slate-300 transition-colors shrink-0 ml-2" />
-          </div>
+          <p className="text-[18px] font-medium text-slate-400 font-sans tracking-normal border-t border-slate-100 pt-2.5 mt-0.5 leading-snug">
+            {description}
+          </p>
         )}
       </div>
     </div>
