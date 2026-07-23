@@ -35,6 +35,12 @@ const periodFrom = _ago30.toLocaleDateString('fr-FR', { day: '2-digit', month: '
 const periodTo = _now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const currentMonth = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}`;
 
+// Availability (%) = (Total Time − Downtime) / Total Time × 100, over the
+// trailing 30 days. Anything at or above this is green; below it is red.
+const AVAILABILITY_OK_THRESHOLD = 99.96;
+const availabilityColor = (pct: number): string =>
+  pct >= AVAILABILITY_OK_THRESHOLD ? '#059669' : '#DC2626';
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const formatUptimeWeeks = (seconds: number): string => {
   if (!seconds || seconds < 0) return '—';
@@ -226,7 +232,7 @@ const PdfReport: React.FC = () => {
 
   // Count-based availability rates (count meeting threshold ÷ total × 100) — distinct
   // from avgAgentAvail above, which averages each agent's own % rather than counting them.
-  const agentAvailCount = agentData.filter(a => Number(a.availability_pct) >= 99).length;
+  const agentAvailCount = agentData.filter(a => Number(a.availability_pct) >= AVAILABILITY_OK_THRESHOLD).length;
   const agentAvailPct = agentData.length > 0 ? (agentAvailCount / agentData.length) * 100 : 0;
 
   const switchStableCount = switchData.filter(sw => sw.restart_count === 0).length;
@@ -237,23 +243,25 @@ const PdfReport: React.FC = () => {
 
   // Grouped per server so the table reads as one block per machine:
   // server health first (availability, restarts, agent), then its services.
-  type KpiRow = { indicator: string; value: string; comment: string; ok: boolean };
+  // Availability rows (server/agent/service) all use the same rule: green
+  // when (Total Time − Downtime) / Total Time × 100 ≥ 99.96%, red below —
+  // AVAILABILITY_OK_THRESHOLD is the single source of truth for that cutoff.
+  type KpiRow = { indicator: string; value: string; comment: string; ok: boolean; pct?: number };
   const kpiRowsByServer: { server: string; rows: KpiRow[] }[] = allServers.map(srv => {
     const rows: KpiRow[] = [];
     const u = uptimeData.find(x => x.host === srv);
     if (u) {
       const uptimeAvail = Number(u.availability_pct);
       if (!isNaN(uptimeAvail)) {
-        const downHours = ((100 - uptimeAvail) / 100) * 720;
+        const downMinutes = ((100 - uptimeAvail) / 100) * 43200;
         rows.push({
           indicator: 'Disponibilité serveur (30j)',
-          value: `${uptimeAvail.toFixed(1)}%`,
-          ok: uptimeAvail >= 99,
-          comment: uptimeAvail >= 99.9
+          value: `${uptimeAvail.toFixed(2)}%`,
+          ok: uptimeAvail >= AVAILABILITY_OK_THRESHOLD,
+          pct: uptimeAvail,
+          comment: uptimeAvail >= AVAILABILITY_OK_THRESHOLD
             ? 'Serveur disponible quasi en continu sur 30 jours.'
-            : uptimeAvail >= 99
-              ? `Environ ${downHours < 1 ? `${Math.round(downHours * 60)} min` : `${downHours.toFixed(1)} h`} d'arrêt cumulé sur 30 jours (voir redémarrages).`
-              : `Environ ${downHours.toFixed(1)} h d'arrêt cumulé sur 30 jours — à investiguer.`,
+            : `Environ ${downMinutes < 60 ? `${Math.round(downMinutes)} min` : `${(downMinutes / 60).toFixed(1)} h`} d'arrêt cumulé sur 30 jours (voir redémarrages).`,
         });
       }
       rows.push({
@@ -268,32 +276,32 @@ const PdfReport: React.FC = () => {
     const a = agentData.find(x => x.host === srv);
     if (a) {
       const avail = Number(a.availability_pct);
-      const ok = avail >= 99;
+      const ok = avail >= AVAILABILITY_OK_THRESHOLD;
       rows.push({
         indicator: 'Disponibilité agent Zabbix',
         value: `${avail.toFixed(2)}%`,
         ok,
-        comment: avail >= 99.5
+        pct: avail,
+        comment: ok
           ? 'Agent de supervision joignable quasi en continu.'
-          : avail >= 99
-            ? "Brèves coupures de communication avec l'agent de supervision."
-            : "Agent de supervision injoignable par moments — mesure la communication Zabbix, distincte de la disponibilité du serveur ci-dessus.",
+          : "Agent de supervision injoignable par moments — mesure la communication Zabbix, distincte de la disponibilité du serveur ci-dessus.",
       });
     }
     const srvServices = serviceData.find(s => s.server_name === srv);
     srvServices?.services.forEach(svc => {
       const name = cleanSvcName(svc.service_name);
-      const ok = svc.incident_days === 0;
-      // % of days without incident over the 30-day window (day granularity —
-      // a day counts as interrupted if the service was seen stopped that day).
-      const svcPct = ((30 - Math.min(30, svc.incident_days)) / 30) * 100;
-      const svcPctStr = Number.isInteger(svcPct) ? `${svcPct}%` : `${svcPct.toFixed(1)}%`;
+      // Real (Total Time − Downtime) / Total Time × 100 over the trailing
+      // 30 days (43,200 minutes), computed from actual downtime duration —
+      // not a day-count approximation.
+      const svcPct = Number(svc.availability_pct);
+      const ok = svcPct >= AVAILABILITY_OK_THRESHOLD;
       rows.push({
         indicator: `Disponibilité — ${name}`,
-        value: svcPctStr,
+        value: `${svcPct.toFixed(2)}%`,
         ok,
+        pct: svcPct,
         comment: ok
-          ? 'Service opérationnel en continu sur 30 jours (aucun arrêt).'
+          ? 'Service opérationnel en continu sur 30 jours (aucun arrêt significatif).'
           : `Service interrompu ${svc.incident_days} jour(s) sur 30${svc.last_incident ? ` — dernier : ${new Date(svc.last_incident).toLocaleDateString('fr-FR')}` : ''}.`,
       });
     });
@@ -477,16 +485,16 @@ const PdfReport: React.FC = () => {
                 color: globalAvailPct >= 90 ? BRAND.green : '#D97706',
               },
               ...(avgServerUptime !== null ? [{
-                value: `${avgServerUptime.toFixed(1)}%`,
+                value: `${avgServerUptime.toFixed(2)}%`,
                 label: 'Uptime Serveurs (moy.)',
                 desc: 'Part du temps où les serveurs étaient allumés',
-                color: avgServerUptime >= 99 ? BRAND.green : '#D97706',
+                color: availabilityColor(avgServerUptime),
               }] : []),
               {
-                value: `${avgAgentAvail.toFixed(1)}%`,
+                value: `${avgAgentAvail.toFixed(2)}%`,
                 label: 'Agent Zabbix (moy.)',
                 desc: 'Part du temps où la supervision répondait',
-                color: avgAgentAvail >= 99 ? BRAND.green : '#D97706',
+                color: availabilityColor(avgAgentAvail),
               },
             ];
             return (
@@ -577,7 +585,10 @@ const PdfReport: React.FC = () => {
                     )}
                     <td className={TDR}>{row.indicator}</td>
                     <td className={TDR}>
-                      <span className="inline-flex items-center gap-1">
+                      <span
+                        className="inline-flex items-center gap-1 font-semibold"
+                        style={{ color: row.pct !== undefined ? availabilityColor(row.pct) : (row.ok ? '#059669' : '#DC2626') }}
+                      >
                         {row.ok ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                         {row.value}
                       </span>
@@ -627,8 +638,8 @@ const PdfReport: React.FC = () => {
               <SubTitle text="Disponibilité des Agents Zabbix – Synthèse" />
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: 'Disponibles (≥99%)', value: `${agentAvailCount}`, bg: '#ECFDF5', border: '#D1FAE5', color: '#059669' },
-                  { label: 'Sous le seuil (<99%)', value: `${agentData.length - agentAvailCount}`, bg: '#FFFBEB', border: '#FDE68A', color: '#D97706' },
+                  { label: 'Disponibles (≥99,96%)', value: `${agentAvailCount}`, bg: '#ECFDF5', border: '#D1FAE5', color: '#059669' },
+                  { label: 'Sous le seuil (<99,96%)', value: `${agentData.length - agentAvailCount}`, bg: '#FEF2F2', border: '#FECACA', color: '#DC2626' },
                   {
                     label: 'Taux de disponibilité',
                     value: `${agentAvailPct.toFixed(0)}%`,
@@ -644,7 +655,7 @@ const PdfReport: React.FC = () => {
                 ))}
               </div>
               <p className="text-[9.5px] mt-2.5 text-[#94A3B8]">
-                Calcul : {agentAvailCount} agent(s) avec disponibilité ≥ 99% ÷ {agentData.length} agent(s) supervisé(s) × 100.
+                Calcul : {agentAvailCount} agent(s) avec disponibilité ≥ 99,96% ÷ {agentData.length} agent(s) supervisé(s) × 100.
               </p>
             </>
           )}

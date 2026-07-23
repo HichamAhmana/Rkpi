@@ -17,6 +17,7 @@ export class ZabbixService implements OnModuleInit {
   private sfpPortsCache: unknown[] = [];
   private switchUptimeCache: unknown[] = [];
   private uptimeStatsCache: unknown[] = [];
+  private serviceAvailabilityCache: unknown[] = [];
 
   constructor(
     @InjectDataSource('zabbix')
@@ -27,6 +28,7 @@ export class ZabbixService implements OnModuleInit {
     void this.refreshSfpPortsCache();
     void this.refreshSwitchUptimeCache();
     void this.refreshUptimeStatsCache();
+    void this.refreshServiceAvailabilityCache();
   }
 
   @Cron('*/2 * * * *')
@@ -65,6 +67,19 @@ export class ZabbixService implements OnModuleInit {
       );
     } catch (err) {
       this.logger.error('Failed to refresh switch uptime cache', err);
+    }
+  }
+
+  @Cron('*/2 * * * *')
+  async refreshServiceAvailabilityCache(): Promise<void> {
+    const start = Date.now();
+    try {
+      this.serviceAvailabilityCache = await this.computeServiceAvailability();
+      this.logger.log(
+        `Service availability cache refreshed: ${this.serviceAvailabilityCache.length} rows in ${Date.now() - start}ms`,
+      );
+    } catch (err) {
+      this.logger.error('Failed to refresh service availability cache', err);
     }
   }
 
@@ -214,43 +229,74 @@ export class ZabbixService implements OnModuleInit {
     `);
   }
 
-  async getServiceAvailability(): Promise<unknown[]> {
-    // Resolve IDs first, then query history with a plain itemid IN list —
-    // folding the item lookup into the big query changes its plan and
-    // re-triggers the live-execution timeouts.
-    const ids = (await this.monitoredServiceItems()).map((r) => r.itemid);
-    if (!ids.length) return [];
-    return this.zabbixDataSource.query(
-      `
-      SELECT /*+ MAX_EXECUTION_TIME(20000) */
-        h.name as host,
-        i.name as service_name,
-        i.itemid,
-        -- Current state
-        (SELECT hu.value FROM history_uint hu 
-         WHERE hu.itemid = i.itemid 
-         ORDER BY hu.clock DESC LIMIT 1) as current_state,
-        -- Number of incidents (non-zero values) in last 30 days
-        (SELECT COUNT(DISTINCT DATE(FROM_UNIXTIME(hu.clock)))
-         FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value != 0
-        AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as incident_days,
-        -- Last incident time
-        (SELECT FROM_UNIXTIME(MAX(hu.clock))
-         FROM history_uint hu
-         WHERE hu.itemid = i.itemid
-         AND hu.value != 0
-        AND hu.clock >= (SELECT MAX(clock) FROM history_uint WHERE itemid = i.itemid) - (30 * 24 * 3600)
-        ) as last_incident
-      FROM items i
-      JOIN hosts h ON h.hostid = i.hostid
-      WHERE i.itemid IN (?)
-      ORDER BY h.name, i.name
-    `,
-      [ids],
-    );
+  // Computed on the 2-min cron cache, like SFP/switch/uptime stats: a
+  // per-item window-function query (below) is the same weight class as
+  // the queries that were found to time out when run live.
+  getServiceAvailability(): unknown[] {
+    return this.serviceAvailabilityCache;
+  }
+
+  private async computeServiceAvailability(): Promise<unknown[]> {
+    const serviceItems = await this.monitoredServiceItems();
+
+    const results: {
+      host: string;
+      service_name: string;
+      itemid: number;
+      current_state: number | null;
+      incident_days: number;
+      last_incident: string | null;
+      availability_pct: number;
+    }[] = [];
+
+    for (const item of serviceItems) {
+      const itemid = item.itemid;
+      const latest = await this.latestHistoryUint(itemid);
+      const nowBound = latest?.clock ?? Math.floor(Date.now() / 1000);
+      const from = nowBound - 30 * 24 * 3600;
+
+      // Downtime = sum of the durations of every sample where the service
+      // was non-zero, each bounded by the next sample's clock (or by
+      // nowBound for the most recent sample). Same drop-detection style as
+      // computeUptimeStats: a window function over one item's history, run
+      // on the cron cache rather than live.
+      const rows: any[] = await this.zabbixDataSource.query(
+        `SELECT /*+ MAX_EXECUTION_TIME(15000) */
+           COUNT(DISTINCT CASE WHEN value != 0 THEN DATE(FROM_UNIXTIME(clock)) END) as incident_days,
+           FROM_UNIXTIME(MAX(CASE WHEN value != 0 THEN clock END)) as last_incident,
+           COALESCE(SUM(CASE WHEN value != 0 THEN COALESCE(next_clock, ?) - clock ELSE 0 END), 0) as downtime_seconds
+         FROM (
+           SELECT clock, value,
+             LEAD(clock) OVER (ORDER BY clock) AS next_clock
+           FROM history_uint
+           WHERE itemid = ? AND clock >= ?
+         ) w`,
+        [nowBound, itemid, from],
+      );
+      const row = (rows[0] ?? {}) as {
+        incident_days: number | string | null;
+        last_incident: string | null;
+        downtime_seconds: number | string | null;
+      };
+
+      const downtimeSeconds = Number(row.downtime_seconds ?? 0);
+      const availabilityPct =
+        Math.round(
+          100 * (1 - Math.min(1, downtimeSeconds / (30 * 24 * 3600))) * 100,
+        ) / 100;
+
+      results.push({
+        host: item.host,
+        service_name: item.name,
+        itemid,
+        current_state: latest ? latest.value : null,
+        incident_days: Number(row.incident_days ?? 0),
+        last_incident: row.last_incident ? String(row.last_incident) : null,
+        availability_pct: availabilityPct,
+      });
+    }
+
+    return results;
   }
 
   // Items are always resolved by host + key, never by item ID: Zabbix
@@ -294,13 +340,13 @@ export class ZabbixService implements OnModuleInit {
   ];
 
   private async monitoredServiceItems(): Promise<
-    { itemid: number; host: string; key_: string }[]
+    { itemid: number; host: string; key_: string; name: string }[]
   > {
     const pairs = ZabbixService.MONITORED_SERVICES;
     const placeholders = pairs.map(() => '(?, ?)').join(', ');
     const params = pairs.flatMap((p) => [p.host, p.key]);
     const rows: any[] = await this.zabbixDataSource.query(
-      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, h.name as host, i.key_
+      `SELECT /*+ MAX_EXECUTION_TIME(5000) */ i.itemid, h.name as host, i.key_, i.name
        FROM items i
        JOIN hosts h ON h.hostid = i.hostid
        WHERE (h.name, i.key_) IN (${placeholders})
@@ -313,6 +359,7 @@ export class ZabbixService implements OnModuleInit {
       itemid: Number(r.itemid),
       host: String(r.host),
       key_: String(r.key_),
+      name: String(r.name),
     }));
   }
 
@@ -509,8 +556,8 @@ export class ZabbixService implements OnModuleInit {
       const downtimeSeconds = Number(drops.downtime_seconds ?? 0);
       const availabilityPct =
         Math.round(
-          100 * (1 - Math.min(1, downtimeSeconds / (30 * 24 * 3600))) * 10,
-        ) / 10;
+          100 * (1 - Math.min(1, downtimeSeconds / (30 * 24 * 3600))) * 100,
+        ) / 100;
 
       results.push({
         host: String(item.host),
@@ -741,8 +788,14 @@ export class ZabbixService implements OnModuleInit {
     // Keep SW1's 3 uplinks together and first, then remaining switches
     // alphabetically by host, each ordered by port number.
     results.sort((a, b) => {
-      const aKey = a.host === 'SW1' ? `0-${a.port_number}` : `1-${a.host}-${a.port_number}`;
-      const bKey = b.host === 'SW1' ? `0-${b.port_number}` : `1-${b.host}-${b.port_number}`;
+      const aKey =
+        a.host === 'SW1'
+          ? `0-${a.port_number}`
+          : `1-${a.host}-${a.port_number}`;
+      const bKey =
+        b.host === 'SW1'
+          ? `0-${b.port_number}`
+          : `1-${b.host}-${b.port_number}`;
       return aKey.localeCompare(bKey);
     });
     return results;

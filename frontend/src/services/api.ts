@@ -77,6 +77,7 @@ export interface ServiceItem {
   current_state: string;
   incident_days: number;
   last_incident: string | null;
+  availability_pct: number;
 }
 
 export interface ServerServices {
@@ -181,6 +182,7 @@ export const getServiceAvailability = async (): Promise<ServerServices[]> => {
       current_state: String(item.current_state !== null && item.current_state !== undefined ? item.current_state : ''),
       incident_days: Number(item.incident_days || 0),
       last_incident: item.last_incident,
+      availability_pct: item.availability_pct !== null && item.availability_pct !== undefined ? Number(item.availability_pct) : 0,
     });
   });
 

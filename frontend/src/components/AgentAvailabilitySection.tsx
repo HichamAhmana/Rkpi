@@ -38,11 +38,11 @@ const formatLastOutageFull = (dateStr: string | null): string => {
   return `${day} ${month} ${year} at ${hours}:${minutes}`;
 };
 
-const getColorForAvailability = (pct: number) => {
-  if (pct >= 99.9) return '#3DBE7A';
-  if (pct >= 99.0) return '#F59E0B';
-  return '#EF4444';
-};
+// Availability (%) = (Total Time − Downtime) / Total Time × 100 over the
+// trailing 30 days. Red only below this cutoff.
+const AVAILABILITY_OK_THRESHOLD = 99.96;
+const getColorForAvailability = (pct: number) =>
+  pct >= AVAILABILITY_OK_THRESHOLD ? '#3DBE7A' : '#EF4444';
 
 const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
