@@ -658,13 +658,17 @@ export class ZabbixService implements OnModuleInit {
   }
 
   // SW1's SFP uplink ports are 49/50/51; remote-site switches (any SW*
-  // host ending in AQ or QVM) only expose port 49. Resolved by host name
-  // + item key (not item ID) so the lookup survives the host being
-  // re-created or re-discovered in Zabbix.
+  // host ending in AQ or QVM) only expose port 49; SW-MAG exposes ports
+  // 25/26. Resolved by host name + item key (not item ID) so the lookup
+  // survives the host being re-created or re-discovered in Zabbix.
   private static readonly SFP_PORT_KEYS = [
     'ifOperStatus.49',
     'ifOperStatus.50',
     'ifOperStatus.51',
+  ];
+  private static readonly MAG_PORT_KEYS = [
+    'ifOperStatus.25',
+    'ifOperStatus.26',
   ];
 
   private async computeSfpPortsStats(): Promise<unknown[]> {
@@ -680,8 +684,9 @@ export class ZabbixService implements OnModuleInit {
              (h.name LIKE 'SW%AQ' OR h.name LIKE 'SW%QVM')
              AND i.key_ = 'ifOperStatus.49'
            )
+           OR (h.name LIKE 'SW%MAG' AND i.key_ IN (?))
          )`,
-      [ZabbixService.SFP_PORT_KEYS],
+      [ZabbixService.SFP_PORT_KEYS, ZabbixService.MAG_PORT_KEYS],
     );
 
     const results: {
